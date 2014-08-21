@@ -13,7 +13,7 @@ import math
 
 import logging
 #create file handler
-loghandler = logging.Filehandler("doctorGUIlog.log")
+loghandler = logging.FileHandler("doctorGUIlog.log")
 loghandler.setLevel(logging.DEBUG)
 
 #set and create logger
