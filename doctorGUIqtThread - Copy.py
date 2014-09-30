@@ -38,7 +38,7 @@ logger.propagate = True
 #logger.error("Message", exec_info=True) by exec true traceback is dumped to logfile
 #used in try/except in except statement
 
-class GenericThread(QtCore.Qthread):
+class GenericThread(QtCore.QThread):
     def __init__(self, function, *args, **kwargs):
         QtCore.QThread.__init__(self)
         self.function = function
@@ -52,15 +52,12 @@ class GenericThread(QtCore.Qthread):
         self.function(*self.args, **self.kwargs)
         return
 
-class MyProcess(threading.Thread):
-    def __init__(self, parent, queueData, queueComm, queueEff):	
-        threading.Thread.__init__(self)
+class SerialThread(QtCore.QThread):
+    def __init__(self, parent):	
+        QtCore.QThread.__init__(self, parent)
         self._stop = False				# flag to stop thread
         self.commReady = False
         self.parent = parent
-        self.queueData = queueData
-        self.queueComm = queueComm
-        self.queueEff = queueEff
         try:
             port = str(self.parent.comPortComboBox.currentText())
             port = int(port[3:])
@@ -73,6 +70,7 @@ class MyProcess(threading.Thread):
             self._stop = True
         else:	
             self.parent.connectStatLabel.setText(u'Connected to ' + str(port))
+            self.parent.connectButton.setText("Disconnect")
             logger.info('Connected to port '+ str(port))
 
     def run (self):						# class which is automatically called after __init__
@@ -82,27 +80,16 @@ class MyProcess(threading.Thread):
         while self._stop == False:
             logger.debug('Worker serial read')
 
-            if self.queueComm.empty() == False:			# reading queue from GUI
-                dataComm = self.queueComm.get()
-                logger.debug('Message to Worker: '+dataComm)
-
-                if dataComm == 'S':				# checking if command to destroy thread appears
-                    self._stop = True
-                    self.ser.close()
-                    logger.info('Worker stop command from Queue')
-
-                else:
-                    self.commReady = True			# if not, letting know something to process appears instead
-
             if self._stop:						# if thread terminated, do not read serial data again (n is flag to not read data)
                 n = 0
+                
             else:
                 n = self.ser.inWaiting()			# check if something in serial buffer
 
             if n:							# read/write serial buffer
                 try:
                     newData = self.ser.read(n)
-                    logger.debug('W got data: ' + repr(newData))
+                    logger.debug('W got data: \n' + repr(newData))
 
                 except serial.SerialException:
                     logger.error('Worker cannot read Serial Port !!!')
@@ -120,15 +107,19 @@ class MyProcess(threading.Thread):
                         logger.debug('W New Frame')
 					
                     if (len(oldData)>92):
-                        if self.queueData.empty():
-                            logger.debug('W Data going to Queue')
-                            self.queueData.put(oldData)
-                            oldData = ''
-                            newFrame = False
-                        else:
-                            logger.debug("Queue full, data DISCARTED")
+                        logger.debug('W Data going to Queue')
+                        self.emit(QtCore.SIGNAL('serialData(PyQt_PyObject)'), oldData)
+                        #oldData = ''
+                        newFrame = False
                 n = 0;
             time.sleep(0.5)
+
+    def toggleStop(self):
+        self._stop = True
+        self.ser.close()
+        logger.info("Serial Data worker stopped")
+        self.parent.connectButton.setText("Connect")
+        self.parent.connectStatLabel.setText("Disconnected")
 
 
 class FileOperations():
@@ -146,15 +137,9 @@ class Doctor(QtGui.QWidget):
     def __init__(self):
         super(Doctor, self).__init__()
 
-        self.queueData = Queue.Queue(maxsize=100) # create queue
-        self.queueComm = Queue.Queue(maxsize=20) # create queue
-        self.queueEff = Queue.Queue(maxsize=3)	 # create queue
-
         self.loggingData = False		# flag for logging button and logging data
 
         self.initUI()
-
-        #self.updtPortsList()
 
     def updtPortsList(self):
         print "updt"
@@ -185,33 +170,23 @@ class Doctor(QtGui.QWidget):
                 yield port[0]
 
     def OnPressConnect(self):
-        self.connector = MyProcess(self, self.queueData, self.queueComm, self.queueEff)
-        self.connector.daemon = True
-        self.connector.start()
+        if not self.connectButtonState:
+            self.connectButtonState = True
+            self.serialThread = SerialThread(self)
+            self.serialThread.start()
 
-        logger.info('Thread started...')
+            self.connect(self.serialThread, QtCore.SIGNAL('serialData(PyQt_PyObject)'), self.processQueueData)
+            logger.info('Thread started...')
 
-        #self.processQueueData()
-
-    def OnPressDisconnect(self):
-        self.queueComm.put('S')
-
-        try:
-            self.after_cancel(self.queueDataID)
-        except:
-            pass
-        try:
-            self.after_cancel(self.rotateArrowsID)
-        except:
-            pass
-
-        self.connector.join()
-
-        if self.loggingData:
-            self.loggingData = False
-            self.logFile.closeFile()
-            self.buttonLog['text'] = 'Log Data'
-
+        else:
+            self.connectButtonState = False
+            self.serialThread.toggleStop()
+    
+            if self.loggingData:
+                self.loggingData = False
+                self.logFile.closeFile()
+                self.parent.logButton.setText("Log Data")
+    
     def OnPressLog(self):
         if self.loggingData:
             self.loggingData = False
@@ -223,6 +198,59 @@ class Doctor(QtGui.QWidget):
             self.logFile = FileOperations()
             self.logFile.openFile(filename)
             self.loggingData = True
+            self.parent.logButton.setText("Logging")
+
+    def processQueueData(self, data):
+        logger.debug("Got data from serial for processing")
+        rawData = data
+        startChar = rawData.find('\x80\x80')
+        if (startChar != -1) and (rawData[startChar+92] == '\x9F'):
+
+            UART_TX_Mode = ord(rawData[2])
+            LC_State = ord(rawData[3])
+            BootState = ord(rawData[4])
+            Ticks = ord(rawData[5])
+            ADC_I2C1_Enable = ord(rawData[6])   # in binary
+            ADC_I2C2_Enable = ord(rawData[7])   # in binary
+            PORTD = ord(rawData[8])             # in binary
+
+            PID_CP_Enabled = ord(rawData[9])
+            I2C_ADC_ColdPlate_NTC = (256*ord(rawData[10]) + ord(rawData[11]))
+            PID_CP_Zpoint = (256*ord(rawData[12]) + ord(rawData[13]))
+            PID_CP_Output = (256*ord(rawData[14]) + ord(rawData[15]))
+            PID_CP_Error = (16777216*ord(rawData[16])+65536*ord(rawData[17])+256*ord(rawData[18])+ord(rawData[19]))/10
+            PID_CP_Integral = (16777216*ord(rawData[20])+65536*ord(rawData[21])+256*ord(rawData[22])+ord(rawData[23]))/10
+            PID_CP_x = (16777216*ord(rawData[24])+65536*ord(rawData[25])+256*ord(rawData[26])+ord(rawData[27]))/10
+
+            PID_Laser_Enabled = ord(rawData[29])
+            I2C_ADC_Laser_NTC = (256*ord(rawData[30]) + ord(rawData[31]))
+            PID_Laser_Zpoint = (256*ord(rawData[32]) + ord(rawData[33]))
+            PID_Laser_Output = (256*ord(rawData[34]) + ord(rawData[35]))
+            PID_Laser_Error = (16777216*ord(rawData[36])+65536*ord(rawData[37])+256*ord(rawData[38])+ord(rawData[39]))/10
+            PID_Laser_Integral = (16777216*ord(rawData[40])+65536*ord(rawData[41])+256*ord(rawData[42])+ord(rawData[43]))/10
+            PID_Laser_x = (16777216*ord(rawData[44])+65536*ord(rawData[45])+256*ord(rawData[46])+ord(rawData[47]))/10
+            
+            PID_AMP_Enabled = ord(rawData[49])
+            PID_Spec_level = (256*ord(rawData[50]) + ord(rawData[51]))
+            PID_AMP_Zpoint = (256*ord(rawData[52]) + ord(rawData[53]))
+            PID_AMP_Output = (256*ord(rawData[54]) + ord(rawData[55]))
+            PID_AMP_Error = (16777216*ord(rawData[56])+65536*ord(rawData[57])+256*ord(rawData[58])+ord(rawData[59]))/10
+            PID_AMP_Integral = (16777216*ord(rawData[60])+65536*ord(rawData[61])+256*ord(rawData[62])+ord(rawData[63]))/10
+            PID_AMP_x = (16777216*ord(rawData[64])+65536*ord(rawData[65])+256*ord(rawData[66])+ord(rawData[67]))/10
+            PID_OSC_Output = (16777216*ord(rawData[68])+65536*ord(rawData[69])+256*ord(rawData[70])+ord(rawData[71]))/10
+
+            WindEyeState = ord(rawData[73])
+            desState = ord(rawData[74])
+            oldState = ord(rawData[75])
+            Change_status = ord(rawData[76])
+            
+            State_Counter_value = (256*ord(rawData[78]) + ord(rawData[79]))
+            Ref_transferred = (256*ord(rawData[80]) + ord(rawData[81]))
+            Flash_errors = (256*ord(rawData[82]) + ord(rawData[83]))
+            Reg_errors = (256*ord(rawData[84]) + ord(rawData[85]))
+
+
+            print("RAWDATA len "+str(len(rawData)))
 
     def initUI(self):
 
@@ -244,7 +272,12 @@ class Doctor(QtGui.QWidget):
 
         unitvbox = QtGui.QVBoxLayout()
 
+#        CPGraph = pg.PlotWidget()
+        w = pg.PlotWidget()
+
         graphsvbox = QtGui.QVBoxLayout()
+        graphsvbox.addLayout(w)
+#        graphsvbox.addLayout(CPGraph)
 
         upperhbox = QtGui.QHBoxLayout()
         upperhbox.addLayout(statevbox)
@@ -261,6 +294,8 @@ class Doctor(QtGui.QWidget):
         #self.comPortComboBox.activated.connect(self.updtPortsList)
 
         self.baudRateComboBox = QtGui.QComboBox()
+
+        self.connectButtonState = False
         self.connectButton = QtGui.QPushButton('Connect', self)
         #self.connect(self.connectButton, QtCore.SIGNAL("highlighted(int)"), self.updtPortsList)
 
@@ -281,6 +316,7 @@ class Doctor(QtGui.QWidget):
         self.setLayout(vbox)
 
         self.connect(self.connectButton, QtCore.SIGNAL("clicked()"), self.OnPressConnect)
+        self.connect(self.logButton, QtCore.SIGNAL("clicked()"), self.OnPressLog)
         self.connect(self.comPortComboBox, QtCore.SIGNAL("activated(int)"), self.updtPortsList)
         #self.connect(self.comPortComboBox, QtCore.SIGNAL("currentIndexChanged(int)"), self.comPortComboBox, QtCore.SLOT("blockSignals(False)"))
         #self.connect(self.comPortComboBox, QtCore.SIGNAL("currentIndexChanged(int)"), self.comPortComboBox.blockSignals(False))

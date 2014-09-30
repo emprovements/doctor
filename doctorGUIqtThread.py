@@ -89,7 +89,8 @@ class SerialThread(QtCore.QThread):
             if n:							# read/write serial buffer
                 try:
                     newData = self.ser.read(n)
-                    logger.debug('W got data: \n' + repr(newData))
+                    #logger.debug('W got data: \n' + repr(newData))
+                    logger.debug('W got data')
 
                 except serial.SerialException:
                     logger.error('Worker cannot read Serial Port !!!')
@@ -185,7 +186,7 @@ class Doctor(QtGui.QWidget):
             if self.loggingData:
                 self.loggingData = False
                 self.logFile.closeFile()
-                self.parent.logButton.setText("Log Data")
+                self.logButton.setText("Log Data")
     
     def OnPressLog(self):
         if self.loggingData:
@@ -205,6 +206,11 @@ class Doctor(QtGui.QWidget):
         rawData = data
         startChar = rawData.find('\x80\x80')
         if (startChar != -1) and (rawData[startChar+92] == '\x9F'):
+
+
+            #logger.debug('Data: \n' + repr(rawData))
+            # for x in xrange(92):
+            #     print str(x)+" "+str(ord(rawData[x]))
 
             UART_TX_Mode = ord(rawData[2])
             LC_State = ord(rawData[3])
@@ -249,6 +255,126 @@ class Doctor(QtGui.QWidget):
             Flash_errors = (256*ord(rawData[82]) + ord(rawData[83]))
             Reg_errors = (256*ord(rawData[84]) + ord(rawData[85]))
 
+            if UART_TX_Mode == 1:
+                UART_TX_Mode = 'Diagnostic'
+            elif UART_TX_Mode == 2:
+                UART_TX_Mode = 'Registers'
+            else:
+                UART_TX_Mode = 'None'
+            self.UART_TX_Mode_label.setText(UART_TX_Mode)
+
+            if BootState == 0:
+                BootState = 'OFF'
+            elif BootState == 1:
+                BootState = 'ON'
+            elif BootState == 2:
+                BootState = 'FAST'
+            else:
+                BootState = 'None'
+            self.BootState_label.setText(BootState)
+
+            self.Ticks_label.setText(str(Ticks))
+
+            if WindEyeState == 48:
+                WindEyeState = 'OFF'
+            elif WindEyeState == 49:
+                WindEyeState = 'ON'
+            elif WindEyeState == 53:
+                WindEyeState = 'IDLE'
+            elif WindEyeState == 56:
+                WindEyeState = 'FLASH'
+            else:
+                WindEyeState = 'None'
+            self.WindEyeState_label.setText(WindEyeState)
+
+            if desState == 48:
+                desState = 'OFF'
+            elif desState == 49:
+                desState= 'ON'
+            elif desState == 53:
+                desState = 'IDLE'
+            elif desState == 56:
+                desState = 'FLASH'
+            else:
+                desState = 'None'
+            self.desState_label.setText(desState)
+
+            if Change_status == 0:
+                Change_status = 'CHANGED'
+            elif Change_status == 1:
+                Change_status = 'CHANGE'
+            elif Change_status == 2:
+                Change_status = 'CHANGING'
+            else:
+                Change_status = 'None'
+            self.Change_status_label.setText(Change_status)
+
+            self.State_counter_label.setText(str(State_Counter_value))
+            self.Ref_transferred_label.setText(str(Ref_transferred))
+            self.Flash_errors_label.setText(str(Flash_errors))
+            self.Reg_errors_label.setText(str(Reg_errors))
+
+#Graphs
+            if len(self.time_np)>59:
+                for x in xrange(1,60):
+                    self.time_np[x-1] = self.time_np[x]
+
+                    self.PID_CP_Zpoint_np[x-1] = self.PID_CP_Zpoint_np[x]
+                    self.PID_CP_Error_np[x-1] = self.PID_CP_Error_np[x]
+                    self.PID_CP_Output_np[x-1] = self.PID_CP_Output_np[x]
+                    
+                    self.PID_Laser_Zpoint_np[x-1] = self.PID_Laser_Zpoint_np[x]
+                    self.PID_Laser_Error_np[x-1] = self.PID_Laser_Error_np[x]
+                    self.PID_Laser_Output_np[x-1] = self.PID_Laser_Output_np[x]
+                    
+                    self.PID_AMP_Zpoint_np[x-1] = self.PID_AMP_Zpoint_np[x]
+                    self.PID_AMP_Error_np[x-1] = self.PID_AMP_Error_np[x]
+                    self.PID_AMP_Output_np[x-1] = self.PID_AMP_Output_np[x]
+                    self.PID_OSC_Output_np[x-1] = self.PID_OSC_Output_np[x]
+
+                self.time_np[59] = self.time_np[58]+1
+
+                self.PID_CP_Zpoint_np[59] = PID_CP_Zpoint
+                self.PID_CP_Error_np[59] = PID_CP_Error
+                self.PID_CP_Output_np[59] = PID_CP_Output
+                
+                self.PID_Laser_Zpoint_np[59] = PID_Laser_Zpoint
+                self.PID_Laser_Error_np[59] = PID_Laser_Error
+                self.PID_Laser_Output_np[59] = PID_Laser_Output
+                
+                self.PID_AMP_Zpoint_np[59] = PID_AMP_Zpoint
+                self.PID_AMP_Error_np[59] = PID_AMP_Error
+                self.PID_AMP_Output_np[59] = PID_AMP_Output
+                self.PID_OSC_Output_np[59] = PID_OSC_Output
+
+            else:
+                self.time_np.append(len(self.time_np)+1)
+
+                self.PID_CP_Zpoint_np.append(PID_CP_Zpoint)
+                self.PID_CP_Error_np.append(PID_CP_Error)
+                self.PID_CP_Output_np.append(PID_CP_Output)
+                
+                self.PID_Laser_Zpoint_np.append(PID_Laser_Zpoint)
+                self.PID_Laser_Error_np.append(PID_Laser_Error)
+                self.PID_Laser_Output_np.append(PID_Laser_Output)
+
+                self.PID_AMP_Zpoint_np.append(PID_AMP_Zpoint)
+                self.PID_AMP_Error_np.append(PID_AMP_Error)
+                self.PID_AMP_Output_np.append(PID_AMP_Output)
+                self.PID_OSC_Output_np.append(PID_OSC_Output)
+        
+            self.PID_CP_Zpoint_curve.setData(self.time_np, self.PID_CP_Zpoint_np, pen=(0,0,255), name='Desire value')
+            self.PID_CP_Error_curve.setData(self.time_np, self.PID_CP_Error_np, pen=(255,0,0), name='Error')
+            self.PID_CP_Output_curve.setData(self.time_np, self.PID_CP_Output_np, pen=(0,255,0), name='Output to CP')
+
+            self.PID_Laser_Zpoint_curve.setData(self.time_np, self.PID_Laser_Zpoint_np, pen=(0,0,255), name='Desire value')
+            self.PID_Laser_Error_curve.setData(self.time_np, self.PID_Laser_Error_np, pen=(255,0,0), name='Error')
+            self.PID_Laser_Output_curve.setData(self.time_np, self.PID_Laser_Output_np, pen=(0,255,0), name='Output to CP')
+            
+            self.PID_AMP_Zpoint_curve.setData(self.time_np, self.PID_AMP_Zpoint_np, pen=(0,0,255), name='Desire value')
+            self.PID_AMP_Error_curve.setData(self.time_np, self.PID_AMP_Error_np, pen=(255,0,0), name='Error')
+            self.PID_AMP_Output_curve.setData(self.time_np, self.PID_AMP_Output_np, pen=(0,255,0), name='Output to CP')
+            self.PID_OSC_Output_curve.setData(self.time_np, self.PID_OSC_Output_np, pen=(200,200,200), name='Output to OSC')
 
             print("RAWDATA len "+str(len(rawData)))
 
@@ -262,24 +388,150 @@ class Doctor(QtGui.QWidget):
         self.receivedDataLabel = QtGui.QLabel('Received Data')
         self.logButton = QtGui.QPushButton('Log Data', self)
 
-        uppesthbox = QtGui.QHBoxLayout()
-        uppesthbox.addWidget(self.receivedDataLabel)
-        uppesthbox.addWidget(self.logButton)
+        self.uppesthbox = QtGui.QHBoxLayout()
+        self.uppesthbox.addStretch(1)
+        self.uppesthbox.addWidget(self.receivedDataLabel)
+        self.uppesthbox.addStretch(1)
+        self.uppesthbox.addWidget(self.logButton)
 
+#add labels
+        self.UART_TX_Mode_hbox = QtGui.QHBoxLayout()
+        self.UART_TX_Mode_label = QtGui.QLabel('0')
+        self.UART_TX_Mode_hbox.addWidget(self.UART_TX_Mode_label)
+        self.UART_TX_Mode_Gbox = QtGui.QGroupBox("UART TX Mode")
+        self.UART_TX_Mode_Gbox.setLayout(self.UART_TX_Mode_hbox)
 
+        self.BootState_hbox = QtGui.QHBoxLayout()
+        self.BootState_label = QtGui.QLabel('0')
+        self.BootState_hbox.addWidget(self.BootState_label)
+        self.BootState_Gbox = QtGui.QGroupBox("Boot State")
+        self.BootState_Gbox.setLayout(self.BootState_hbox)
+
+        self.Ticks_hbox = QtGui.QHBoxLayout()
+        self.Ticks_label = QtGui.QLabel('0')
+        self.Ticks_hbox.addWidget(self.Ticks_label)
+        self.Ticks_Gbox = QtGui.QGroupBox("Ticks")
+        self.Ticks_Gbox.setLayout(self.Ticks_hbox)
         
-        statevbox = QtGui.QVBoxLayout()
+        self.WindEyeState_hbox = QtGui.QHBoxLayout()
+        self.WindEyeState_label = QtGui.QLabel('None')
+        self.WindEyeState_hbox.addWidget(self.WindEyeState_label)
+        self.WindEyeState_Gbox = QtGui.QGroupBox("Wind Eye State")
+        self.WindEyeState_Gbox.setLayout(self.WindEyeState_hbox)
+        
+        self.desState_hbox = QtGui.QHBoxLayout()
+        self.desState_label = QtGui.QLabel('0')
+        self.desState_hbox.addWidget(self.desState_label)
+        self.desState_Gbox = QtGui.QGroupBox("desire State")
+        self.desState_Gbox.setLayout(self.desState_hbox)
+        
+        self.Change_status_hbox = QtGui.QHBoxLayout()
+        self.Change_status_label = QtGui.QLabel('0')
+        self.Change_status_hbox.addWidget(self.Change_status_label)
+        self.Change_status_Gbox = QtGui.QGroupBox("Change status")
+        self.Change_status_Gbox.setLayout(self.Change_status_hbox)
+        
+        self.State_counter_hbox = QtGui.QHBoxLayout()
+        self.State_counter_label = QtGui.QLabel('0')
+        self.State_counter_hbox.addWidget(self.State_counter_label)
+        self.State_counter_Gbox = QtGui.QGroupBox("State counter value")
+        self.State_counter_Gbox.setLayout(self.State_counter_hbox)
+        
+        self.Ref_transferred_hbox = QtGui.QHBoxLayout()
+        self.Ref_transferred_label = QtGui.QLabel('0')
+        self.Ref_transferred_hbox.addWidget(self.Ref_transferred_label)
+        self.Ref_transferred_Gbox = QtGui.QGroupBox("Reference fr. transferred")
+        self.Ref_transferred_Gbox.setLayout(self.Ref_transferred_hbox)
 
-        unitvbox = QtGui.QVBoxLayout()
+        self.Flash_errors_hbox = QtGui.QHBoxLayout()
+        self.Flash_errors_label = QtGui.QLabel('0')
+        self.Flash_errors_hbox.addWidget(self.Flash_errors_label)
+        self.Flash_errors_Gbox = QtGui.QGroupBox("Flash errors")
+        self.Flash_errors_Gbox.setLayout(self.Flash_errors_hbox)
 
-        graphsvbox = QtGui.QVBoxLayout()
+        self.Reg_errors_hbox = QtGui.QHBoxLayout()
+        self.Reg_errors_label = QtGui.QLabel('0')
+        self.Reg_errors_hbox.addWidget(self.Reg_errors_label)
+        self.Reg_errors_Gbox = QtGui.QGroupBox("Register errors")
+        self.Reg_errors_Gbox.setLayout(self.Reg_errors_hbox)
 
-        upperhbox = QtGui.QHBoxLayout()
-        upperhbox.addLayout(statevbox)
-        upperhbox.addStretch(1)
-        upperhbox.addLayout(unitvbox)
-        upperhbox.addStretch(1)
-        upperhbox.addLayout(graphsvbox)
+        self.datavbox = QtGui.QVBoxLayout()
+        self.datavbox.addStretch(1)
+        self.datavbox.addWidget(self.UART_TX_Mode_Gbox)
+        self.datavbox.addWidget(self.BootState_Gbox)
+        self.datavbox.addWidget(self.Ticks_Gbox)
+        self.datavbox.addWidget(self.WindEyeState_Gbox)
+        self.datavbox.addWidget(self.desState_Gbox)
+        self.datavbox.addWidget(self.Change_status_Gbox)
+        self.datavbox.addWidget(self.State_counter_Gbox)
+        self.datavbox.addWidget(self.Ref_transferred_Gbox)
+        self.datavbox.addWidget(self.State_counter_Gbox)
+        self.datavbox.addWidget(self.Ref_transferred_Gbox)
+        self.datavbox.addWidget(self.Flash_errors_Gbox)
+        self.datavbox.addWidget(self.Reg_errors_Gbox)
+        self.datavbox.addStretch(1)
+
+        self.statevbox = QtGui.QVBoxLayout()
+
+        self.unitvbox = QtGui.QVBoxLayout()
+
+        #x = np.arange(1000)
+        #y = np.random.normal(size=(3, 1000))
+
+        self.glw = pg.GraphicsLayoutWidget()
+        self.time_np = []
+        
+        
+        self.plotCP = self.glw.addPlot(title="ColdPlate regulation")
+        self.plotCP.enableAutoRange()
+        self.plotCP.addLegend()
+        self.PID_CP_Zpoint_np = []
+        self.PID_CP_Zpoint_curve = self.plotCP.plot(self.time_np, self.PID_CP_Zpoint_np, pen=(0,0,255), name='Desire value')
+        self.PID_CP_Output_np = []
+        self.PID_CP_Output_curve = self.plotCP.plot(self.time_np, self.PID_CP_Output_np, pen=(0,255,0), name='Output to CP')
+        self.PID_CP_Error_np = []
+        self.PID_CP_Error_curve = self.plotCP.plot(self.time_np, self.PID_CP_Error_np, pen=(255,0,0), name='Error')
+
+        self.glw.nextRow()
+        self.plotLaser = self.glw.addPlot(title="Laser ADC regulation")
+        self.plotLaser.enableAutoRange()
+        #self.plotLaser.addLegend()
+        self.PID_Laser_Zpoint_np = []
+        self.PID_Laser_Zpoint_curve = self.plotLaser.plot(self.time_np, self.PID_Laser_Zpoint_np, pen=(0,0,255), name='Desire value')
+        self.PID_Laser_Output_np = []
+        self.PID_Laser_Output_curve = self.plotLaser.plot(self.time_np, self.PID_Laser_Output_np, pen=(0,255,0), name='Output to Laser')
+        self.PID_Laser_Error_np = []
+        self.PID_Laser_Error_curve = self.plotLaser.plot(self.time_np, self.PID_Laser_Error_np, pen=(255,0,0), name='Error')
+       
+        self.glw.nextRow()
+        self.plotAMP = self.glw.addPlot(title="Laser AMP regulation")
+        self.plotAMP.enableAutoRange()
+        #self.plotAMP.addLegend()
+        self.PID_AMP_Zpoint_np = []
+        self.PID_AMP_Zpoint_curve = self.plotAMP.plot(self.time_np, self.PID_AMP_Zpoint_np, pen=(0,0,255), name='Desire value')
+        self.PID_AMP_Output_np = []
+        self.PID_AMP_Output_curve = self.plotAMP.plot(self.time_np, self.PID_AMP_Output_np, pen=(0,255,0), name='Output to AMP')
+        self.PID_AMP_Error_np = []
+        self.PID_AMP_Error_curve = self.plotAMP.plot(self.time_np, self.PID_AMP_Error_np, pen=(255,0,0), name='Error')
+        self.PID_OSC_Output_np = []
+        self.PID_OSC_Output_curve = self.plotAMP.plot(self.time_np, self.PID_OSC_Output_np, pen=(200, 200, 200), name='Output to OSC')
+
+        #legend = pg.LegendItem()
+        #legend.addItem(self.PID_CP_Zpoint_curve, name=self.PID_CP_Zpoint_curve.opts['name'])
+        #legend.setParentItem(self.plotCP)
+        #legend.anchor((0,0),(0,0))
+
+        self.graphsvbox = QtGui.QVBoxLayout()
+        self.graphsvbox.addWidget(self.glw)
+
+        self.upperhbox = QtGui.QHBoxLayout()
+        self.upperhbox.addLayout(self.datavbox)
+        self.upperhbox.addStretch(1)
+        self.upperhbox.addLayout(self.statevbox)
+        self.upperhbox.addStretch(1)
+        self.upperhbox.addLayout(self.unitvbox)
+        self.upperhbox.addStretch(1)
+        self.upperhbox.addLayout(self.graphsvbox)
 		
         
         self.connectStatLabel = QtGui.QLabel('Disconnected')
@@ -294,21 +546,22 @@ class Doctor(QtGui.QWidget):
         self.connectButton = QtGui.QPushButton('Connect', self)
         #self.connect(self.connectButton, QtCore.SIGNAL("highlighted(int)"), self.updtPortsList)
 
-        lowerhbox = QtGui.QHBoxLayout()
-        lowerhbox.addWidget(self.connectStatLabel)
-        lowerhbox.addStretch(1)
-        lowerhbox.addWidget(self.comPortComboBox)
-        lowerhbox.addWidget(self.baudRateComboBox)
-        lowerhbox.addWidget(self.connectButton)
+        self.lowerhbox = QtGui.QHBoxLayout()
+        self.lowerhbox.addStretch(1)
+        self.lowerhbox.addWidget(self.connectStatLabel)
+        self.lowerhbox.addStretch(1)
+        self.lowerhbox.addWidget(self.comPortComboBox)
+        self.lowerhbox.addWidget(self.baudRateComboBox)
+        self.lowerhbox.addWidget(self.connectButton)
 
 
-        vbox = QtGui.QVBoxLayout()              # MAIN Box
-        vbox.addLayout(uppesthbox)
-        vbox.addLayout(upperhbox)
-        vbox.addLayout(lowerhbox)
-        vbox.addStretch(1)
+        self.vbox = QtGui.QVBoxLayout()              # MAIN Box
+        self.vbox.addLayout(self.uppesthbox)
+        self.vbox.addLayout(self.upperhbox)
+        self.vbox.addLayout(self.lowerhbox)
+        self.vbox.addStretch(1)
 
-        self.setLayout(vbox)
+        self.setLayout(self.vbox)
 
         self.connect(self.connectButton, QtCore.SIGNAL("clicked()"), self.OnPressConnect)
         self.connect(self.logButton, QtCore.SIGNAL("clicked()"), self.OnPressLog)
