@@ -133,6 +133,84 @@ class FileOperations():
     def closeFile(self):
         self.file.close()
 
+class unitImage(QtGui.QGraphicsPixmapItem):
+
+    def __init__(self):
+        super(unitImage, self).__init__()
+        self.setPixmap(QtGui.QPixmap("unit.png"))
+
+class unitView(QtGui.QGraphicsView):
+
+    def __init__(self, parent):
+        super(unitView, self).__init__()
+        self.setBackgroundBrush(QtGui.QColor(0, 0, 0))
+        self.setRenderHint(QtGui.QPainter.Antialiasing)
+        self.initScene()
+
+    def initScene(self):
+        self.scene = QtGui.QGraphicsScene(self)
+        self.setSceneRect(0, 0, 510, 500)
+
+        self.image = unitImage()
+        self.scene.addItem(self.image)
+
+        self.setScene(self.scene)
+
+class stateImage(QtGui.QGraphicsPixmapItem):
+
+    def __init__(self):
+        super(stateImage, self).__init__()
+        self.setPixmap(QtGui.QPixmap("states.png"))
+
+class stateView(QtGui.QGraphicsView):
+
+    def __init__(self, parent):
+        super(stateView, self).__init__()
+        self.setBackgroundBrush(QtGui.QColor(0, 0, 0))
+        self.setRenderHint(QtGui.QPainter.Antialiasing)
+        self.initScene()
+
+    def initScene(self):
+        self.scene = QtGui.QGraphicsScene(self)
+        self.setSceneRect(0, 0, 240, 500)
+
+        self.image = stateImage()
+        self.scene.addItem(self.image)
+
+        self.setScene(self.scene)
+
+
+
+class Unit(QtGui.QWidget):
+
+    def __init__(self, parent):
+        super(Unit, self).__init__()
+        self.parent = parent
+        self.painter = QtGui.QPainter()
+        self.loadImage()
+
+    def paintEvent(self, event):
+        self.painter.begin(self)
+        self.drawCustomWidget(self.painter)
+        self.painter.end()
+
+    def drawCustomWidget(self, parent):
+        print "Unit"
+
+    def loadImage(self):
+        self.img = QtGui.QImage("unit.png")
+        if self.img.isNull():
+            logger.info("Error loading image")
+        else:
+            print "loaded"
+            self.painter.begin(self)
+            self.iw = self.img.width()
+            self.ih = self.img.height()
+            self.rect = QtCore.QRect(0, 0, self.iw, self.ih)
+            self.painter.drawImage(self.rect, self.img)
+            self.painter.end()
+
+
 
 class Doctor(QtGui.QWidget):
     def __init__(self):
@@ -200,6 +278,9 @@ class Doctor(QtGui.QWidget):
             self.logFile.openFile(filename)
             self.loggingData = True
             self.parent.logButton.setText("Logging")
+
+    #def unitChanged(self):
+    #    self.unit.repaint()
 
     def processQueueData(self, data):
         logger.debug("Got data from serial for processing")
@@ -375,6 +456,9 @@ class Doctor(QtGui.QWidget):
             self.PID_AMP_Error_curve.setData(self.time_np, self.PID_AMP_Error_np, pen=(255,0,0), name='Error')
             self.PID_AMP_Output_curve.setData(self.time_np, self.PID_AMP_Output_np, pen=(0,255,0), name='Output to CP')
             self.PID_OSC_Output_curve.setData(self.time_np, self.PID_OSC_Output_np, pen=(200,200,200), name='Output to OSC')
+            
+            self.unitChanged()
+            #self.emit(QtCore.SIGNAL('unitSignal(int)'), LC_State)
 
             print("RAWDATA len "+str(len(rawData)))
 
@@ -456,7 +540,6 @@ class Doctor(QtGui.QWidget):
         self.Reg_errors_Gbox.setLayout(self.Reg_errors_hbox)
 
         self.datavbox = QtGui.QVBoxLayout()
-        self.datavbox.addStretch(1)
         self.datavbox.addWidget(self.UART_TX_Mode_Gbox)
         self.datavbox.addWidget(self.BootState_Gbox)
         self.datavbox.addWidget(self.Ticks_Gbox)
@@ -471,20 +554,29 @@ class Doctor(QtGui.QWidget):
         self.datavbox.addWidget(self.Reg_errors_Gbox)
         self.datavbox.addStretch(1)
 
+        self.stateView = stateView(self)
         self.statevbox = QtGui.QVBoxLayout()
+        self.stateView.setFixedWidth(242)
+        #self.stateView.setFixedHeight(502)
+        self.statevbox.addWidget(self.stateView)
 
+        self.unitView = unitView(self)
         self.unitvbox = QtGui.QVBoxLayout()
+        self.unitView.setFixedWidth(512)
+        #self.unitView.setFixedHeight(502)
+        self.unitvbox.addWidget(self.unitView)
 
         #x = np.arange(1000)
         #y = np.random.normal(size=(3, 1000))
 
         self.glw = pg.GraphicsLayoutWidget()
+        self.glw.setFixedWidth(512)
         self.time_np = []
         
         
         self.plotCP = self.glw.addPlot(title="ColdPlate regulation")
         self.plotCP.enableAutoRange()
-        self.plotCP.addLegend()
+        #self.plotCP.addLegend()
         self.PID_CP_Zpoint_np = []
         self.PID_CP_Zpoint_curve = self.plotCP.plot(self.time_np, self.PID_CP_Zpoint_np, pen=(0,0,255), name='Desire value')
         self.PID_CP_Output_np = []
@@ -525,14 +617,13 @@ class Doctor(QtGui.QWidget):
         self.graphsvbox.addWidget(self.glw)
 
         self.upperhbox = QtGui.QHBoxLayout()
-        self.upperhbox.addLayout(self.datavbox)
-        self.upperhbox.addStretch(1)
         self.upperhbox.addLayout(self.statevbox)
         self.upperhbox.addStretch(1)
         self.upperhbox.addLayout(self.unitvbox)
         self.upperhbox.addStretch(1)
         self.upperhbox.addLayout(self.graphsvbox)
-		
+        self.upperhbox.addStretch(1)
+        self.upperhbox.addLayout(self.datavbox)
         
         self.connectStatLabel = QtGui.QLabel('Disconnected')
         self.comPortComboBox = QtGui.QComboBox()
@@ -566,11 +657,12 @@ class Doctor(QtGui.QWidget):
         self.connect(self.connectButton, QtCore.SIGNAL("clicked()"), self.OnPressConnect)
         self.connect(self.logButton, QtCore.SIGNAL("clicked()"), self.OnPressLog)
         self.connect(self.comPortComboBox, QtCore.SIGNAL("activated(int)"), self.updtPortsList)
+        #self.connect(self, QtCore.SIGNAL("unitSignal(int)"), self.unitChanged)
         #self.connect(self.comPortComboBox, QtCore.SIGNAL("currentIndexChanged(int)"), self.comPortComboBox, QtCore.SLOT("blockSignals(False)"))
         #self.connect(self.comPortComboBox, QtCore.SIGNAL("currentIndexChanged(int)"), self.comPortComboBox.blockSignals(False))
 
         #self.resize(250, 150)
-        self.center_window()
+        #self.center_window()
         self.setWindowTitle('MCU Telemetry')
         self.setWindowIcon(QtGui.QIcon('web.png'))
 
