@@ -154,6 +154,10 @@ class unitView(QtGui.QGraphicsView):
         self.image = unitImage()
         self.scene.addItem(self.image)
 
+        self.lBeam = self.scene.addRect(50,50,10,30)
+        self.lBeam.setBrush(QtGui.QColor(200,10,10))
+        self.lBeam.rotate(45)
+
         self.setScene(self.scene)
 
 class stateImage(QtGui.QGraphicsPixmapItem):
@@ -177,7 +181,42 @@ class stateView(QtGui.QGraphicsView):
         self.image = stateImage()
         self.scene.addItem(self.image)
 
+        self.boot = self.scene.addEllipse(175,140,10,10)
+        self.boot.setBrush(QtGui.QColor(200,10,10))
+        
+        self.off = self.scene.addEllipse(175,200,10,10)
+        self.off.setBrush(QtGui.QColor(200,10,10))
+        
+        self.idle = self.scene.addEllipse(170,260,10,10)
+        self.idle.setBrush(QtGui.QColor(200,10,10))
+
+        self.flash = self.scene.addEllipse(170,315,10,10)
+        self.flash.setBrush(QtGui.QColor(200,10,10))
+        
+        self.normal = self.scene.addEllipse(50,180,20,20)
+        self.normal.setBrush(QtGui.QColor(200,10,10))
+
         self.setScene(self.scene)
+
+    def change(self, state):
+        self.clear()
+        if state == 'boot':
+            self.boot.setBrush(QtGui.QColor(10,200,10))
+        elif state == 'off':
+            self.off.setBrush(QtGui.QColor(10,200,10))
+        elif state == 'idle':
+            self.idle.setBrush(QtGui.QColor(10,200,10))
+        elif state == 'flash':
+            self.flash.setBrush(QtGui.QColor(10,200,10))
+        elif state == 'on':
+            self.normal.setBrush(QtGui.QColor(10,200,10))
+
+    def clear(self):
+        self.boot.setBrush(QtGui.QColor(200,10,10))
+        self.off.setBrush(QtGui.QColor(200,10,10))
+        self.idle.setBrush(QtGui.QColor(200,10,10))
+        self.flash.setBrush(QtGui.QColor(200,10,10))
+        self.normal.setBrush(QtGui.QColor(200,10,10))
 
 
 
@@ -348,8 +387,10 @@ class Doctor(QtGui.QWidget):
                 BootState = 'OFF'
             elif BootState == 1:
                 BootState = 'ON'
+                self.stateView.change('boot')
             elif BootState == 2:
                 BootState = 'FAST'
+                self.stateView.change('boot')
             else:
                 BootState = 'None'
             self.BootState_label.setText(BootState)
@@ -358,12 +399,16 @@ class Doctor(QtGui.QWidget):
 
             if WindEyeState == 48:
                 WindEyeState = 'OFF'
+                self.stateView.change('off')
             elif WindEyeState == 49:
                 WindEyeState = 'ON'
+                self.stateView.change('on')
             elif WindEyeState == 53:
                 WindEyeState = 'IDLE'
+                self.stateView.change('idle')
             elif WindEyeState == 56:
                 WindEyeState = 'FLASH'
+                self.stateView.change('flash')
             else:
                 WindEyeState = 'None'
             self.WindEyeState_label.setText(WindEyeState)
@@ -457,7 +502,8 @@ class Doctor(QtGui.QWidget):
             self.PID_AMP_Output_curve.setData(self.time_np, self.PID_AMP_Output_np, pen=(0,255,0), name='Output to CP')
             self.PID_OSC_Output_curve.setData(self.time_np, self.PID_OSC_Output_np, pen=(200,200,200), name='Output to OSC')
             
-            self.unitChanged()
+
+            #self.unitChanged()
             #self.emit(QtCore.SIGNAL('unitSignal(int)'), LC_State)
 
             print("RAWDATA len "+str(len(rawData)))
