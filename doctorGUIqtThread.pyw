@@ -10,12 +10,9 @@ import math
 
 import pyqtgraph as pg
 
-import numpy
-from scipy.interpolate import *
-
 import logging
 #create file handler
-loghandler = logging.FileHandler("doctorGUIlog.log")
+loghandler = logging.FileHandler("doctorGUI.log")
 loghandler.setLevel(logging.DEBUG)
 
 #set and create logger
@@ -112,7 +109,7 @@ class SerialThread(QtCore.QThread):
                         #oldData = ''
                         newFrame = False
                 n = 0;
-            time.sleep(0.5)
+            time.sleep(0.1)
 
     def toggleStop(self):
         self._stop = True
@@ -449,7 +446,7 @@ class Doctor(QtGui.QWidget):
         if (startChar != -1) and (rawData[startChar+92] == '\x9F'):
 
 
-            #logger.debug('Data: \n' + repr(rawData))
+            logger.debug('Data: \n' + repr(rawData))
             # for x in xrange(92):
             #     print str(x)+" "+str(ord(rawData[x]))
 
@@ -560,15 +557,14 @@ class Doctor(QtGui.QWidget):
             if self.Ticks != self.oldTicks:
                 self.Ticks_label.setText(str(self.Ticks))
 
-            if self.oldWindEyeState != self.WindEyeState:
-                if self.WindEyeState == 48:
-                    self.stateView.change('off')
-                elif self.WindEyeState == 49:
-                    self.stateView.change('on')
-                elif self.WindEyeState == 53:
-                    self.stateView.change('idle')
-                elif self.WindEyeState == 56:
-                    self.stateView.change('flash')
+            if self.WindEyeState == 48:
+                self.stateView.change('off')
+            elif self.WindEyeState == 49:
+                self.stateView.change('on')
+            elif self.WindEyeState == 53:
+                self.stateView.change('idle')
+            elif self.WindEyeState == 56:
+                self.stateView.change('flash')
             
             if self.oldoldState != self.oldState:
                 if self.oldState == 48:
