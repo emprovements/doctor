@@ -58,7 +58,6 @@ class SerialThread(QtCore.QThread):
             port = str(self.parent.comPortComboBox.currentText())
             port = int(port[3:])
 #            baud = (self.parent.boxBaud.get()).split()
-            print port
             baud = "115200"
             self.ser = serial.Serial(port-1, baudrate=int(baud), timeout=0, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE)
         except serial.SerialException:
@@ -95,18 +94,19 @@ class SerialThread(QtCore.QThread):
                     if newFrame:
                         oldData = oldData+newData
 
-                    if newData[0] == '\x80' and newData[1] == '\x80':
-                        newFrame = True
-                        oldData = ''
-                        oldData = newData
+                    if len(newData)>2:
+                        if newData[0] == '\x80' and newData[1] == '\x80':
+                            newFrame = True
+                            oldData = ''
+                            oldData = newData
 
-                        #logger.debug('W New Frame: ' + repr(newData))
-                        logger.debug('W New Frame')
+                            #logger.debug('W New Frame: ' + repr(newData))
+                            logger.debug('W New Frame')
 					
                     if (len(oldData)>92):
                         logger.debug('W Data going to Queue')
                         self.emit(QtCore.SIGNAL('serialData(PyQt_PyObject)'), oldData)
-                        #oldData = ''
+                        oldData = ''
                         newFrame = False
                 n = 0;
             time.sleep(0.1)
@@ -196,10 +196,13 @@ class UnitView(QtGui.QGraphicsView):
         self.setScene(self.scene)
 
     def hHeaterSet(self, state):
-        if state == 'on':
-            self.hHeater.setPen(20, 255, 92)
-        elif state == 'off':
-            self.hHeater.setPen(255, 49, 47)
+        if state == 1:
+            brush = QtGui.QBrush(QtGui.QColor("#13FF5C"))
+            self.hHeater.setPen(QtGui.QPen(brush, 3))
+
+        elif state == 0:
+            brush = QtGui.QBrush(QtGui.QColor("#FF312F"))
+            self.hHeater.setPen(QtGui.QPen(brush, 3))
 
     def beamsSet(self, state):
         if state == 0:
@@ -264,24 +267,24 @@ class UnitView(QtGui.QGraphicsView):
                 state.insert(0, 0)
             for x in xrange(len(state)):
                 if state[x] == 1:
-                    if x == 2:
+                    if x == 5:
                         self.HWTEC_enabled.setBrush(QtGui.QColor(20,255,92))
-                    elif x == 3:
-                        self.CP_enabled.setBrush(QtGui.QColor(20,255,92))
                     elif x == 4:
-                        self.HWAMP_enabled.setBrush(QtGui.QColor(20,255,92))
-                    elif x == 5:
-                        self.HWOSC_enabled.setBrush(QtGui.QColor(20,255,92))
+                        self.CP_enabled.setBrush(QtGui.QColor(20,255,92))
+                    elif x == 3:
+                        self.HWAMP_enabled.setBrush(QtGui.QColor(255,49,47))
+                    elif x == 2:
+                        self.HWOSC_enabled.setBrush(QtGui.QColor(255,49,47))
 
                 else:
-                    if x == 2:
+                    if x == 5:
                         self.HWTEC_enabled.setBrush(QtGui.QColor(255,49,47))
-                    elif x == 3:
-                        self.CP_enabled.setBrush(QtGui.QColor(255,49,47))
                     elif x == 4:
-                        self.HWAMP_enabled.setBrush(QtGui.QColor(255,49,47))
-                    elif x == 5:
-                        self.HWOSC_enabled.setBrush(QtGui.QColor(255,49,47))
+                        self.CP_enabled.setBrush(QtGui.QColor(255,49,47))
+                    elif x == 3:
+                        self.HWAMP_enabled.setBrush(QtGui.QColor(20,255,92))
+                    elif x == 2:
+                        self.HWOSC_enabled.setBrush(QtGui.QColor(20,255,92))
 
 class stateImage(QtGui.QGraphicsPixmapItem):
 
@@ -346,19 +349,6 @@ class StateView(QtGui.QGraphicsView):
         elif state == 'on':
             self.normal.setBrush(QtGui.QColor(232,192,36))
 
-    def old(self, state):
-        if state == 'boot':
-            self.boot.setBrush(QtGui.QColor(0,84,87))
-        elif state == 'off':
-            self.off.setBrush(QtGui.QColor(0,84,87))
-        elif state == 'idle':
-            self.idle.setBrush(QtGui.QColor(0,84,87))
-        elif state == 'flash':
-            self.flash.setBrush(QtGui.QColor(0,84,87))
-        elif state == 'on':
-            self.normal.setBrush(QtGui.QColor(0,84,87))
-
-
     def clear(self):
         self.boot.setBrush(QtGui.QColor(200,10,10))
         self.off.setBrush(QtGui.QColor(200,10,10))
@@ -378,7 +368,6 @@ class Doctor(QtGui.QWidget):
         self.initUI()
 
     def updtPortsList(self):
-        print "updt"
         index = self.comPortComboBox.currentIndex()
         #self.comPortComboBox.blockSignals(True)
         boxPortList = []
@@ -439,16 +428,28 @@ class Doctor(QtGui.QWidget):
     #def unitChanged(self):
     #    self.unit.repaint()
 
+    def convertNTC(self, value):
+        val0 = (value * 3.3) / 32767.0
+        u1 = 3.3 - val0
+        i1 = u1 / 10000.0
+        try:
+            Rt = val0 / i1
+        except:
+            Rt = val0
+        mid1 = math.log(10000.0 / Rt)
+        mid2 = 3988.0 / mid1
+        mid3 = mid2 * (-298.15)
+        mid4 = 298.15 - mid2
+        result = (mid3 / mid4) - 273.15
+
+        return result
+
+
     def processQueueData(self, data):
         logger.debug("Got data from serial for processing")
         rawData = data
         startChar = rawData.find('\x80\x80')
         if (startChar != -1) and (rawData[startChar+92] == '\x9F'):
-
-
-            logger.debug('Data: \n' + repr(rawData))
-            # for x in xrange(92):
-            #     print str(x)+" "+str(ord(rawData[x]))
 
             self.oldUART_TX_Mode = self.UART_TX_Mode
             self.UART_TX_Mode = ord(rawData[2])
@@ -475,37 +476,80 @@ class Doctor(QtGui.QWidget):
             I2C_ADC_ColdPlate_NTC = (256*ord(rawData[10]) + ord(rawData[11]))
             PID_CP_Zpoint = (256*ord(rawData[12]) + ord(rawData[13]))
             PID_CP_Output = (256*ord(rawData[14]) + ord(rawData[15]))
-            PID_CP_Error = (16777216*ord(rawData[16])+65536*ord(rawData[17])+256*ord(rawData[18])+ord(rawData[19]))/10
-            PID_CP_Integral = (16777216*ord(rawData[20])+65536*ord(rawData[21])+256*ord(rawData[22])+ord(rawData[23]))/10
-            PID_CP_x = (16777216*ord(rawData[24])+65536*ord(rawData[25])+256*ord(rawData[26])+ord(rawData[27]))/10
+            PID_CP_Error = (16777216*ord(rawData[16])+65536*ord(rawData[17])+256*ord(rawData[18])+ord(rawData[19]))
+            if ord(rawData[16]) > 127:
+                PID_CP_Error -= 4294967296
+            PID_CP_Error = PID_CP_Error/10
+
+            PID_CP_Integral = (16777216*ord(rawData[20])+65536*ord(rawData[21])+256*ord(rawData[22])+ord(rawData[23]))
+            if ord(rawData[20]) > 127:
+                PID_CP_Integral -= 4294967296
+            PID_CP_Integral = PID_CP_Integral/10
+
+            PID_CP_x = (16777216*ord(rawData[24])+65536*ord(rawData[25])+256*ord(rawData[26])+ord(rawData[27]))
+            if ord(rawData[24]) > 127:
+                PID_CP_x -= 4294967296
+            PID_CP_x = PID_CP_x/10
+
 
             self.oldPID_Laser_Enabled = self.PID_Laser_Enabled
             self.PID_Laser_Enabled = ord(rawData[29])
             I2C_ADC_Laser_NTC = (256*ord(rawData[30]) + ord(rawData[31]))
             PID_Laser_Zpoint = (256*ord(rawData[32]) + ord(rawData[33]))
             PID_Laser_Output = (256*ord(rawData[34]) + ord(rawData[35]))
-            PID_Laser_Error = (16777216*ord(rawData[36])+65536*ord(rawData[37])+256*ord(rawData[38])+ord(rawData[39]))/10
-            PID_Laser_Integral = (16777216*ord(rawData[40])+65536*ord(rawData[41])+256*ord(rawData[42])+ord(rawData[43]))/10
-            PID_Laser_x = (16777216*ord(rawData[44])+65536*ord(rawData[45])+256*ord(rawData[46])+ord(rawData[47]))/10
+            PID_Laser_Error = (16777216*ord(rawData[36])+65536*ord(rawData[37])+256*ord(rawData[38])+ord(rawData[39]))
+            if ord(rawData[36]) > 127:
+                PID_Laser_Error -= 4294967296
+            PID_Laser_Error = PID_Laser_Error/10
+
+            PID_Laser_Integral = (16777216*ord(rawData[40])+65536*ord(rawData[41])+256*ord(rawData[42])+ord(rawData[43]))
+            if ord(rawData[40]) > 127:
+                PID_Laser_Integral -= 4294967296
+            PID_Laser_Integral = PID_Laser_Integral/10
+
+            PID_Laser_x = (16777216*ord(rawData[44])+65536*ord(rawData[45])+256*ord(rawData[46])+ord(rawData[47]))
+            if ord(rawData[44]) > 127:
+                PID_Laser_x -= 4294967296
+            PID_Laser_x = PID_Laser_x/10
+
             
             self.oldPID_AMP_Enabled = self.PID_AMP_Enabled
             self.PID_AMP_Enabled = ord(rawData[49])
             PID_Spec_level = (256*ord(rawData[50]) + ord(rawData[51]))
             PID_AMP_Zpoint = (256*ord(rawData[52]) + ord(rawData[53]))
             PID_AMP_Output = (256*ord(rawData[54]) + ord(rawData[55]))
-            PID_AMP_Error = (16777216*ord(rawData[56])+65536*ord(rawData[57])+256*ord(rawData[58])+ord(rawData[59]))/10
-            PID_AMP_Integral = (16777216*ord(rawData[60])+65536*ord(rawData[61])+256*ord(rawData[62])+ord(rawData[63]))/10
-            PID_AMP_x = (16777216*ord(rawData[64])+65536*ord(rawData[65])+256*ord(rawData[66])+ord(rawData[67]))/10
-            PID_OSC_Output = (16777216*ord(rawData[68])+65536*ord(rawData[69])+256*ord(rawData[70])+ord(rawData[71]))/10
+            PID_AMP_Error = (16777216*ord(rawData[56])+65536*ord(rawData[57])+256*ord(rawData[58])+ord(rawData[59]))
+            if ord(rawData[56]) > 127:
+                PID_AMP_Error -= 4294967296
+            PID_AMP_Error = PID_AMP_Error/10
+
+            PID_AMP_Integral = (16777216*ord(rawData[60])+65536*ord(rawData[61])+256*ord(rawData[62])+ord(rawData[63]))
+            if ord(rawData[60]) > 127:
+                PID_AMP_Integral -= 4294967296
+            PID_AMP_Integral = PID_AMP_Integral/10
+
+            PID_AMP_x = (16777216*ord(rawData[64])+65536*ord(rawData[65])+256*ord(rawData[66])+ord(rawData[67]))
+            if ord(rawData[64]) > 127:
+                PID_AMP_x -= 4294967296
+            PID_AMP_x = PID_AMP_x/10
+
+            PID_OSC_Output = (16777216*ord(rawData[68])+65536*ord(rawData[69])+256*ord(rawData[70])+ord(rawData[71]))
+            if ord(rawData[68]) > 127:
+                PID_OSC_Output -= 4294967296
+            PID_OSC_Output = PID_OSC_Output/10
+
 
             self.oldWindEyeState = self.WindEyeState
             self.WindEyeState = ord(rawData[73])
             self.olddesState = self.desState
             self.desState = ord(rawData[74])
-            self.oldoldState = self.oldState
-            self.oldState = ord(rawData[75])
+            self.oldsomething = self.something
+            self.something = ord(rawData[75])
             self.oldChange_status = self.Change_status
             self.Change_status = ord(rawData[76])
+
+            self.oldhHeater = self.hHeater
+            self.hHeater = ord(rawData[77])
             
             self.State_Counter_value = (256*ord(rawData[78]) + ord(rawData[79]))
             self.oldRef_transferred = self.Ref_transferred
@@ -515,24 +559,8 @@ class Doctor(QtGui.QWidget):
             self.oldReg_errors = self.Reg_errors
             self.Reg_errors = (256*ord(rawData[84]) + ord(rawData[85]))
 
-#        self.BootState = 0
-#        self.Ticks = 0
-#        sefl.ADC_I2C1_Enable = 0   # in binary
-#        self.ADC_I2C2_Enable = 0   # in binary
-#        self.PORTD = 0             # in binary
-#
-#        self.PID_CP_Enabled = 0
-#        self.PID_Laser_Enabled = 0
-#        self.PID_AMP_Enabled = 0
-#    
-#        self.WindEyeState = 0
-#        self.desState = 0
-#        self.oldState = 0
-#        self.Change_status = 0
-#            
-#        self.Ref_transferred = 0
-#        self.Flash_errors = 0
-#        self.Reg_errors = 0
+            if self.oldhHeater != self.hHeater:
+                self.unitView.hHeaterSet(self.hHeater)
 
             if self.UART_TX_Mode != self.oldUART_TX_Mode:
                 if self.UART_TX_Mode == 1:
@@ -557,25 +585,17 @@ class Doctor(QtGui.QWidget):
             if self.Ticks != self.oldTicks:
                 self.Ticks_label.setText(str(self.Ticks))
 
-            if self.WindEyeState == 48:
-                self.stateView.change('off')
-            elif self.WindEyeState == 49:
-                self.stateView.change('on')
-            elif self.WindEyeState == 53:
-                self.stateView.change('idle')
-            elif self.WindEyeState == 56:
-                self.stateView.change('flash')
+            if self.BootState == 0:
+                if self.oldWindEyeState != self.WindEyeState:
+                    if self.WindEyeState == 48:
+                        self.stateView.change('off')
+                    elif self.WindEyeState == 49:
+                        self.stateView.change('on')
+                    elif self.WindEyeState == 53:
+                        self.stateView.change('idle')
+                    elif self.WindEyeState == 56:
+                        self.stateView.change('flash')
             
-            if self.oldoldState != self.oldState:
-                if self.oldState == 48:
-                    self.stateView.old('off')
-                elif self.oldState == 49:
-                    self.stateView.old('on')
-                elif self.oldState == 53:
-                    self.stateView.old('idle')
-                elif self.oldState == 56:
-                    self.stateView.old('flash')
-
             if self.olddesState != self.desState:
                 if self.desState == 48:
                     self.stateView.desire('off')
@@ -618,13 +638,20 @@ class Doctor(QtGui.QWidget):
 
             self.unitView.beamsSet(self.LC_State)
 #Graphs
+            #PID_CP_Zpoint = self.convertNTC(PID_CP_Zpoint)
+            #PID_CP_Error = self.convertNTC(PID_CP_Error)
+            #PID_CP_x = self.convertNTC(PID_CP_x)
+            #PID_CP_Integral = self.convertNTC(PID_CP_Integral)
+
             if len(self.time_np)>59:
                 for x in xrange(1,60):
                     self.time_np[x-1] = self.time_np[x]
 
                     self.PID_CP_Zpoint_np[x-1] = self.PID_CP_Zpoint_np[x]
                     self.PID_CP_Error_np[x-1] = self.PID_CP_Error_np[x]
-                    self.PID_CP_Output_np[x-1] = self.PID_CP_Output_np[x]
+                    self.PID_CP_x_np[x-1] = self.PID_CP_x_np[x]
+                    self.PID_CP_Integral_np[x-1] = self.PID_CP_Integral_np[x]
+                    self.PID_CP_FB_np[x-1] = self.PID_CP_FB_np[x]
                     
                     self.PID_Laser_Zpoint_np[x-1] = self.PID_Laser_Zpoint_np[x]
                     self.PID_Laser_Error_np[x-1] = self.PID_Laser_Error_np[x]
@@ -639,7 +666,9 @@ class Doctor(QtGui.QWidget):
 
                 self.PID_CP_Zpoint_np[59] = PID_CP_Zpoint
                 self.PID_CP_Error_np[59] = PID_CP_Error
-                self.PID_CP_Output_np[59] = PID_CP_Output
+                self.PID_CP_x_np[59] = PID_CP_x
+                self.PID_CP_Integral_np[59] = PID_CP_Integral
+                self.PID_CP_FB_np[59] = I2C_ADC_ColdPlate_NTC
                 
                 self.PID_Laser_Zpoint_np[59] = PID_Laser_Zpoint
                 self.PID_Laser_Error_np[59] = PID_Laser_Error
@@ -655,7 +684,9 @@ class Doctor(QtGui.QWidget):
 
                 self.PID_CP_Zpoint_np.append(PID_CP_Zpoint)
                 self.PID_CP_Error_np.append(PID_CP_Error)
-                self.PID_CP_Output_np.append(PID_CP_Output)
+                self.PID_CP_x_np.append(PID_CP_x)
+                self.PID_CP_Integral_np.append(PID_CP_Integral)
+                self.PID_CP_FB_np.append(I2C_ADC_ColdPlate_NTC)
                 
                 self.PID_Laser_Zpoint_np.append(PID_Laser_Zpoint)
                 self.PID_Laser_Error_np.append(PID_Laser_Error)
@@ -668,7 +699,9 @@ class Doctor(QtGui.QWidget):
         
             self.PID_CP_Zpoint_curve.setData(self.time_np, self.PID_CP_Zpoint_np, pen=(0,0,255), name='Desire value')
             self.PID_CP_Error_curve.setData(self.time_np, self.PID_CP_Error_np, pen=(255,0,0), name='Error')
-            self.PID_CP_Output_curve.setData(self.time_np, self.PID_CP_Output_np, pen=(0,255,0), name='Output to CP')
+            self.PID_CP_Output_curve.setData(self.time_np, self.PID_CP_x_np, pen=(0,255,0), name='Action Value')
+            self.PID_CP_Integral_curve.setData(self.time_np, self.PID_CP_Integral_np, pen=(255,255,255), name='Integral')
+            self.PID_CP_FB_curve.setData(self.time_np, self.PID_CP_FB_np, pen=(255,255,0), name='Feedback')
 
             self.PID_Laser_Zpoint_curve.setData(self.time_np, self.PID_Laser_Zpoint_np, pen=(0,0,255), name='Desire value')
             self.PID_Laser_Error_curve.setData(self.time_np, self.PID_Laser_Error_np, pen=(255,0,0), name='Error')
@@ -783,10 +816,14 @@ class Doctor(QtGui.QWidget):
         #self.plotCP.addLegend()
         self.PID_CP_Zpoint_np = []
         self.PID_CP_Zpoint_curve = self.plotCP.plot(self.time_np, self.PID_CP_Zpoint_np, pen=(0,0,255), name='Desire value')
-        self.PID_CP_Output_np = []
-        self.PID_CP_Output_curve = self.plotCP.plot(self.time_np, self.PID_CP_Output_np, pen=(0,255,0), name='Output to CP')
+        self.PID_CP_x_np = []
+        self.PID_CP_Output_curve = self.plotCP.plot(self.time_np, self.PID_CP_x_np, pen=(0,255,0), name='Output to CP')
         self.PID_CP_Error_np = []
         self.PID_CP_Error_curve = self.plotCP.plot(self.time_np, self.PID_CP_Error_np, pen=(255,0,0), name='Error')
+        self.PID_CP_Integral_np = []
+        self.PID_CP_Integral_curve = self.plotCP.plot(self.time_np, self.PID_CP_Integral_np, pen=(255,255,255), name='Integral')
+        self.PID_CP_FB_np = []
+        self.PID_CP_FB_curve = self.plotCP.plot(self.time_np, self.PID_CP_FB_np, pen=(255,255,0), name='Feedback')
 
         self.glw.nextRow()
         self.plotLaser = self.glw.addPlot(title="Laser ADC regulation")
@@ -873,7 +910,7 @@ class Doctor(QtGui.QWidget):
         self.show()
             
         self.UART_TX_Mode = 0
-        self.BootState = 0
+        self.BootState = 3
         self.Ticks = 0
         self.ADC_I2C1_Enable = 0   # in binary
         self.ADC_I2C2_Enable = 0   # in binary
@@ -885,9 +922,11 @@ class Doctor(QtGui.QWidget):
     
         self.WindEyeState = 0
         self.desState = 0
-        self.oldState = 0
-        self.Change_status = 0
+        self.something = 0
+        self.Change_status = 3
             
+        self.hHeater = 0
+
         self.Ref_transferred = 0
         self.Flash_errors = 0
         self.Reg_errors = 0
