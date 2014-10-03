@@ -523,10 +523,10 @@ class Doctor(QtGui.QWidget):
                 PID_AMP_Error -= 4294967296
             PID_AMP_Error = PID_AMP_Error/10
 
-            PID_AMP_Integral = (16777216*ord(rawData[60])+65536*ord(rawData[61])+256*ord(rawData[62])+ord(rawData[63]))
-            if ord(rawData[60]) > 127:
-                PID_AMP_Integral -= 4294967296
-            PID_AMP_Integral = PID_AMP_Integral/10
+            PID_AMP_Integral = (16777216*ord(rawData[60])+65536*ord(rawData[61])+256*ord(rawData[62])+ord(rawData[63]))/10 # Remove /10
+            #if ord(rawData[60]) > 127:
+            #    PID_AMP_Integral -= 4294967296
+            #PID_AMP_Integral = PID_AMP_Integral/10
 
             PID_AMP_x = (16777216*ord(rawData[64])+65536*ord(rawData[65])+256*ord(rawData[66])+ord(rawData[67]))
             if ord(rawData[64]) > 127:
@@ -536,7 +536,6 @@ class Doctor(QtGui.QWidget):
             PID_OSC_Output = (16777216*ord(rawData[68])+65536*ord(rawData[69])+256*ord(rawData[70])+ord(rawData[71]))
             if ord(rawData[68]) > 127:
                 PID_OSC_Output -= 4294967296
-            PID_OSC_Output = PID_OSC_Output/10
 
 
             self.oldWindEyeState = self.WindEyeState
@@ -596,15 +595,16 @@ class Doctor(QtGui.QWidget):
                     elif self.WindEyeState == 56:
                         self.stateView.change('flash')
             
-            if self.olddesState != self.desState:
-                if self.desState == 48:
-                    self.stateView.desire('off')
-                elif self.desState == 49:
-                    self.stateView.desire('on')
-                elif self.desState == 53:
-                    self.stateView.desire('idle')
-                elif self.desState == 56:
-                    self.stateView.desire('flash')
+            if self.desState != self.WindEyeState:
+                if self.olddesState != self.desState:
+                    if self.desState == 48:
+                        self.stateView.desire('off')
+                    elif self.desState == 49:
+                        self.stateView.desire('on')
+                    elif self.desState == 53:
+                        self.stateView.desire('idle')
+                    elif self.desState == 56:
+                        self.stateView.desire('flash')
 
             if self.oldChange_status != self.Change_status:
                 if self.Change_status == 0:
@@ -638,10 +638,10 @@ class Doctor(QtGui.QWidget):
 
             self.unitView.beamsSet(self.LC_State)
 #Graphs
-            #PID_CP_Zpoint = self.convertNTC(PID_CP_Zpoint)
-            #PID_CP_Error = self.convertNTC(PID_CP_Error)
-            #PID_CP_x = self.convertNTC(PID_CP_x)
-            #PID_CP_Integral = self.convertNTC(PID_CP_Integral)
+            PID_CP_Zpoint = self.convertNTC(PID_CP_Zpoint)
+            I2C_ADC_ColdPlate_NTC = self.convertNTC(I2C_ADC_ColdPlate_NTC)
+            PID_Laser_Zpoint = self.convertNTC(PID_Laser_Zpoint)
+            I2C_ADC_Laser_NTC = self.convertNTC(I2C_ADC_Laser_NTC)
 
             if len(self.time_np)>59:
                 for x in xrange(1,60):
@@ -654,10 +654,12 @@ class Doctor(QtGui.QWidget):
                     self.PID_CP_FB_np[x-1] = self.PID_CP_FB_np[x]
                     
                     self.PID_Laser_Zpoint_np[x-1] = self.PID_Laser_Zpoint_np[x]
+                    self.PID_Laser_FB_np[x-1] = self.PID_Laser_FB_np[x]
                     self.PID_Laser_Error_np[x-1] = self.PID_Laser_Error_np[x]
-                    self.PID_Laser_Output_np[x-1] = self.PID_Laser_Output_np[x]
+                    self.PID_Laser_x_np[x-1] = self.PID_Laser_x_np[x]
                     
                     self.PID_AMP_Zpoint_np[x-1] = self.PID_AMP_Zpoint_np[x]
+                    self.PID_AMP_FB_np[x-1] = self.PID_AMP_FB_np[x]
                     self.PID_AMP_Error_np[x-1] = self.PID_AMP_Error_np[x]
                     self.PID_AMP_Output_np[x-1] = self.PID_AMP_Output_np[x]
                     self.PID_OSC_Output_np[x-1] = self.PID_OSC_Output_np[x]
@@ -666,36 +668,40 @@ class Doctor(QtGui.QWidget):
 
                 self.PID_CP_Zpoint_np[59] = PID_CP_Zpoint
                 self.PID_CP_Error_np[59] = PID_CP_Error
-                self.PID_CP_x_np[59] = PID_CP_x
-                self.PID_CP_Integral_np[59] = PID_CP_Integral
+                self.PID_CP_x_np[59] = PID_CP_x/100
+                self.PID_CP_Integral_np[59] = PID_CP_Integral/100
                 self.PID_CP_FB_np[59] = I2C_ADC_ColdPlate_NTC
                 
                 self.PID_Laser_Zpoint_np[59] = PID_Laser_Zpoint
-                self.PID_Laser_Error_np[59] = PID_Laser_Error
-                self.PID_Laser_Output_np[59] = PID_Laser_Output
+                self.PID_Laser_FB_np[59] = I2C_ADC_Laser_NTC
+                self.PID_Laser_Error_np[59] = PID_Laser_Error/100
+                self.PID_Laser_x_np[59] = PID_Laser_x/100
                 
                 self.PID_AMP_Zpoint_np[59] = PID_AMP_Zpoint
-                self.PID_AMP_Error_np[59] = PID_AMP_Error
-                self.PID_AMP_Output_np[59] = PID_AMP_Output
-                self.PID_OSC_Output_np[59] = PID_OSC_Output
+                self.PID_AMP_FB_np[59] = PID_Spec_level
+                self.PID_AMP_Error_np[59] = PID_AMP_Error/100
+                self.PID_AMP_Output_np[59] = PID_AMP_Output/1000
+                self.PID_OSC_Output_np[59] = PID_OSC_Output/1000
 
             else:
                 self.time_np.append(len(self.time_np)+1)
 
                 self.PID_CP_Zpoint_np.append(PID_CP_Zpoint)
                 self.PID_CP_Error_np.append(PID_CP_Error)
-                self.PID_CP_x_np.append(PID_CP_x)
-                self.PID_CP_Integral_np.append(PID_CP_Integral)
+                self.PID_CP_x_np.append(PID_CP_x/100)
+                self.PID_CP_Integral_np.append(PID_CP_Integral/100)
                 self.PID_CP_FB_np.append(I2C_ADC_ColdPlate_NTC)
                 
                 self.PID_Laser_Zpoint_np.append(PID_Laser_Zpoint)
-                self.PID_Laser_Error_np.append(PID_Laser_Error)
-                self.PID_Laser_Output_np.append(PID_Laser_Output)
+                self.PID_Laser_FB_np.append(I2C_ADC_Laser_NTC)
+                self.PID_Laser_Error_np.append(PID_Laser_Error/100)
+                self.PID_Laser_x_np.append(PID_Laser_x/100)
 
                 self.PID_AMP_Zpoint_np.append(PID_AMP_Zpoint)
-                self.PID_AMP_Error_np.append(PID_AMP_Error)
-                self.PID_AMP_Output_np.append(PID_AMP_Output)
-                self.PID_OSC_Output_np.append(PID_OSC_Output)
+                self.PID_AMP_FB_np.append(PID_Spec_level)
+                self.PID_AMP_Error_np.append(PID_AMP_Error/100)
+                self.PID_AMP_Output_np.append(PID_AMP_Output/100)
+                self.PID_OSC_Output_np.append(PID_OSC_Output/100)
         
             self.PID_CP_Zpoint_curve.setData(self.time_np, self.PID_CP_Zpoint_np, pen=(0,0,255), name='Desire value')
             self.PID_CP_Error_curve.setData(self.time_np, self.PID_CP_Error_np, pen=(255,0,0), name='Error')
@@ -704,10 +710,12 @@ class Doctor(QtGui.QWidget):
             self.PID_CP_FB_curve.setData(self.time_np, self.PID_CP_FB_np, pen=(255,255,0), name='Feedback')
 
             self.PID_Laser_Zpoint_curve.setData(self.time_np, self.PID_Laser_Zpoint_np, pen=(0,0,255), name='Desire value')
+            self.PID_Laser_FB_curve.setData(self.time_np, self.PID_Laser_FB_np, pen=(255,255,0), name='Feedback value')
             self.PID_Laser_Error_curve.setData(self.time_np, self.PID_Laser_Error_np, pen=(255,0,0), name='Error')
-            self.PID_Laser_Output_curve.setData(self.time_np, self.PID_Laser_Output_np, pen=(0,255,0), name='Output to CP')
+            self.PID_Laser_x_curve.setData(self.time_np, self.PID_Laser_x_np, pen=(0,255,0), name='Output to CP')
             
             self.PID_AMP_Zpoint_curve.setData(self.time_np, self.PID_AMP_Zpoint_np, pen=(0,0,255), name='Desire value')
+            self.PID_AMP_FB_curve.setData(self.time_np, self.PID_AMP_FB_np, pen=(255,255,0), name='Feedback')
             self.PID_AMP_Error_curve.setData(self.time_np, self.PID_AMP_Error_np, pen=(255,0,0), name='Error')
             self.PID_AMP_Output_curve.setData(self.time_np, self.PID_AMP_Output_np, pen=(0,255,0), name='Output to CP')
             self.PID_OSC_Output_curve.setData(self.time_np, self.PID_OSC_Output_np, pen=(200,200,200), name='Output to OSC')
@@ -807,41 +815,61 @@ class Doctor(QtGui.QWidget):
         #y = np.random.normal(size=(3, 1000))
 
         self.glw = pg.GraphicsLayoutWidget()
-        self.glw.setFixedWidth(512)
+        #self.glw.setFixedWidth(600)
+        self.glw.setFixedHeight(750)
         self.time_np = []
         
-        
-        self.plotCP = self.glw.addPlot(title="ColdPlate regulation")
+
+        self.glw.nextRow()
+        self.plotCP_Tmp = self.glw.addPlot(title="ColdPlate regulation(Temp)")
+        self.plotCP_Tmp.enableAutoRange()
+        self.PID_CP_Zpoint_np = []
+        self.PID_CP_Zpoint_curve = self.plotCP_Tmp.plot(self.time_np, self.PID_CP_Zpoint_np, pen=(0,0,255), name='Desire value')
+        self.PID_CP_FB_np = []
+        self.PID_CP_FB_curve = self.plotCP_Tmp.plot(self.time_np, self.PID_CP_FB_np, pen=(255,255,0), name='Feedback')
+
+        self.glw.nextRow()
+        self.plotCP = self.glw.addPlot(title="ColdPlate regulation(div by 100)")
         self.plotCP.enableAutoRange()
         #self.plotCP.addLegend()
-        self.PID_CP_Zpoint_np = []
-        self.PID_CP_Zpoint_curve = self.plotCP.plot(self.time_np, self.PID_CP_Zpoint_np, pen=(0,0,255), name='Desire value')
         self.PID_CP_x_np = []
         self.PID_CP_Output_curve = self.plotCP.plot(self.time_np, self.PID_CP_x_np, pen=(0,255,0), name='Output to CP')
         self.PID_CP_Error_np = []
         self.PID_CP_Error_curve = self.plotCP.plot(self.time_np, self.PID_CP_Error_np, pen=(255,0,0), name='Error')
         self.PID_CP_Integral_np = []
         self.PID_CP_Integral_curve = self.plotCP.plot(self.time_np, self.PID_CP_Integral_np, pen=(255,255,255), name='Integral')
-        self.PID_CP_FB_np = []
-        self.PID_CP_FB_curve = self.plotCP.plot(self.time_np, self.PID_CP_FB_np, pen=(255,255,0), name='Feedback')
 
-        self.glw.nextRow()
-        self.plotLaser = self.glw.addPlot(title="Laser ADC regulation")
-        self.plotLaser.enableAutoRange()
-        #self.plotLaser.addLegend()
-        self.PID_Laser_Zpoint_np = []
-        self.PID_Laser_Zpoint_curve = self.plotLaser.plot(self.time_np, self.PID_Laser_Zpoint_np, pen=(0,0,255), name='Desire value')
-        self.PID_Laser_Output_np = []
-        self.PID_Laser_Output_curve = self.plotLaser.plot(self.time_np, self.PID_Laser_Output_np, pen=(0,255,0), name='Output to Laser')
-        self.PID_Laser_Error_np = []
-        self.PID_Laser_Error_curve = self.plotLaser.plot(self.time_np, self.PID_Laser_Error_np, pen=(255,0,0), name='Error')
        
         self.glw.nextRow()
-        self.plotAMP = self.glw.addPlot(title="Laser AMP regulation")
+        self.plotLaser_Tmp = self.glw.addPlot(title="Laser TEC regulation(Temp)")
+        self.plotLaser_Tmp.enableAutoRange()
+        self.PID_Laser_Zpoint_np = []
+        self.PID_Laser_Zpoint_curve = self.plotLaser_Tmp.plot(self.time_np, self.PID_Laser_Zpoint_np, pen=(0,0,255), name='Desire value')
+        self.PID_Laser_FB_np = []
+        self.PID_Laser_FB_curve = self.plotLaser_Tmp.plot(self.time_np, self.PID_Laser_FB_np, pen=(255,255,0), name='Feedback')
+
+        self.glw.nextRow()
+        self.plotLaser = self.glw.addPlot(title="Laser TEC regulation(div by 100)")
+        self.plotLaser.enableAutoRange()
+        #self.plotLaser.addLegend()
+        self.PID_Laser_x_np = []
+        self.PID_Laser_x_curve = self.plotLaser.plot(self.time_np, self.PID_Laser_x_np, pen=(0,255,0), name='Output to Laser')
+        self.PID_Laser_Error_np = []
+        self.PID_Laser_Error_curve = self.plotLaser.plot(self.time_np, self.PID_Laser_Error_np, pen=(255,0,0), name='Error')
+
+
+        self.glw.nextRow()
+        self.plotAMP_Tmp = self.glw.addPlot(title="Laser AMP/OSC regulation(Spectrum level)")
+        self.plotAMP_Tmp.enableAutoRange()
+        self.PID_AMP_Zpoint_np = []
+        self.PID_AMP_Zpoint_curve = self.plotAMP_Tmp.plot(self.time_np, self.PID_AMP_Zpoint_np, pen=(0,0,255), name='Desire value')
+        self.PID_AMP_FB_np = []
+        self.PID_AMP_FB_curve = self.plotAMP_Tmp.plot(self.time_np, self.PID_AMP_FB_np, pen=(255,255,0), name='Feedback')
+
+        self.glw.nextRow()
+        self.plotAMP = self.glw.addPlot(title="Laser AMP/OSC regulation(div by 100)")
         self.plotAMP.enableAutoRange()
         #self.plotAMP.addLegend()
-        self.PID_AMP_Zpoint_np = []
-        self.PID_AMP_Zpoint_curve = self.plotAMP.plot(self.time_np, self.PID_AMP_Zpoint_np, pen=(0,0,255), name='Desire value')
         self.PID_AMP_Output_np = []
         self.PID_AMP_Output_curve = self.plotAMP.plot(self.time_np, self.PID_AMP_Output_np, pen=(0,255,0), name='Output to AMP')
         self.PID_AMP_Error_np = []
