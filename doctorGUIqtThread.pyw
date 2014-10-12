@@ -236,8 +236,8 @@ class UnitView(QtGui.QGraphicsView):
         elif state == 1:
             brushGreen = QtGui.QBrush(QtGui.QColor("#13FF5C"))
             brushRed = QtGui.QBrush(QtGui.QColor("#FF312F"))
-            self.lBeam.setPen(QtGui.QPen(brushRed, 3))
-            self.rBeam.setPen(QtGui.QPen(brushGreen, 3))
+            self.rBeam.setPen(QtGui.QPen(brushRed, 3))
+            self.lBeam.setPen(QtGui.QPen(brushGreen, 3))
             #self.rBeam.setBrush(QtGui.QColor(255,49,47))
             #self.lBeam.setBrush(QtGui.QColor(20,255,92))
         else:
