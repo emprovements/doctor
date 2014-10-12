@@ -455,7 +455,10 @@ class Doctor(QtGui.QWidget):
             Rt = val0 / i1
         except:
             Rt = val0
-        mid1 = math.log(10000.0 / Rt)
+        try:
+            mid1 = math.log(10000.0 / Rt)
+        except:
+            pass
         mid2 = 3988.0 / mid1
         mid3 = mid2 * (-298.15)
         mid4 = 298.15 - mid2
