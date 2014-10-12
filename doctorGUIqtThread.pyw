@@ -109,7 +109,7 @@ class SerialThread(QtCore.QThread):
                             logger.debug('W New Frame')
 
                         else:
-                            if newFrame == False
+                            if newFrame == False:
                                 self.parent.receivedDataLabel.setText("Corrupted data received")
 					
                     if (len(oldData)>92):
