@@ -1,3 +1,4 @@
+
 import sys, os
 from PyQt4 import QtGui, QtCore
 
@@ -108,7 +109,7 @@ class SerialThread(QtCore.QThread):
                         oldData = ''
                         newFrame = False
                 n = 0;
-            time.sleep(0.1)
+            time.sleep(0.05)
 
     def toggleStop(self):
         self._stop = True
@@ -144,7 +145,7 @@ class UnitView(QtGui.QGraphicsView):
 
     def initScene(self):
         self.scene = QtGui.QGraphicsScene(self)
-        self.setSceneRect(0, 0, 510, 500)
+        self.setSceneRect(0, 0, 510, 734)
 
         self.image = unitImage()
         self.scene.addItem(self.image)
@@ -153,43 +154,51 @@ class UnitView(QtGui.QGraphicsView):
         #self.lBeam.setBrush(QtGui.QColor(200,10,10))
         #self.lBeam.rotate(45)
 
-        self.lBeam = self.scene.addEllipse(75, 71, 10, 10)
-        self.lBeam.setBrush(QtGui.QColor(255,49,47))
-        
-        self.rBeam = self.scene.addEllipse(162, 70, 10, 10)
-        self.rBeam.setBrush(QtGui.QColor(255,49,47))
+        #self.lBeam = self.scene.addEllipse(75, 71, 10, 10)
+        #self.lBeam.setBrush(QtGui.QColor(255,49,47))
 
-        self.hHeater = self.scene.addLine(111, 80, 176, 111)
+        self.lBeam = self.scene.addLine(158, 127, 218, 101)
+        brush = QtGui.QBrush(QtGui.QColor("#FF312F"))
+        self.lBeam.setPen(QtGui.QPen(brush, 3))
+        
+        #self.rBeam = self.scene.addEllipse(162, 70, 10, 10)
+        #self.rBeam.setBrush(QtGui.QColor(255,49,47))
+
+        self.rBeam = self.scene.addLine(288, 102, 347, 127)
+        brush = QtGui.QBrush(QtGui.QColor("#FF312F"))
+        self.rBeam.setPen(QtGui.QPen(brush, 3))
+
+        self.hHeater = self.scene.addLine(162, 155, 200, 260)
         brush = QtGui.QBrush(QtGui.QColor("#FF312F"))
         self.hHeater.setPen(QtGui.QPen(brush, 3))
 
-        self.i2c2 = self.scene.addLine(130, 315, 220, 315)
+        self.i2c2 = self.scene.addLine(67, 458, 143, 458)
         brush = QtGui.QBrush(QtGui.QColor("#FF312F"))
         self.i2c2.setPen(QtGui.QPen(brush, 3))
 
-        self.i2c1 = self.scene.addLine(290, 419, 390, 420)
+        self.i2c1 = self.scene.addLine(229, 615, 319, 615)
         brush = QtGui.QBrush(QtGui.QColor("#FF312F"))
-        self.i2c1.setPen(QtGui.QPen(brush, 5))
+        self.i2c1.setPen(QtGui.QPen(brush, 3))
 
-        self.i2c1LaserNTC = self.scene.addEllipse(248, 370, 7, 7)
+        self.i2c1LaserNTC = self.scene.addEllipse(196, 519, 7, 7)
         self.i2c1LaserNTC.setBrush(QtGui.QColor(255,49,47))
         
-        self.i2c1CpNTC = self.scene.addEllipse(263, 370, 7, 7)
+        self.i2c1CpNTC = self.scene.addEllipse(211, 519, 7, 7)
         self.i2c1CpNTC.setBrush(QtGui.QColor(255,49,47))
 
-        self.i2c1Pd_ADC = self.scene.addEllipse(283, 370, 7, 7)
+        self.i2c1Pd_ADC = self.scene.addEllipse(226, 519, 7, 7)
         self.i2c1Pd_ADC.setBrush(QtGui.QColor(255,49,47))
 
-        self.HWAMP_enabled = self.scene.addEllipse(248, 347, 7, 18)
+        self.HWAMP_enabled = self.scene.addEllipse(191, 489, 15, 15)
         self.HWAMP_enabled.setBrush(QtGui.QColor(255,49,47))
         
-        self.HWOSC_enabled = self.scene.addEllipse(263, 347, 7, 18)
+        self.HWOSC_enabled = self.scene.addEllipse(208, 489, 15, 15)
         self.HWOSC_enabled.setBrush(QtGui.QColor(255,49,47))
 
-        self.HWTEC_enabled = self.scene.addEllipse(283, 347, 7, 18)
+        self.HWTEC_enabled = self.scene.addEllipse(223, 489, 15, 15)
         self.HWTEC_enabled.setBrush(QtGui.QColor(255,49,47))
 
-        self.CP_enabled = self.scene.addEllipse(260,385, 20, 20)
+        self.CP_enabled = self.scene.addEllipse(192,558, 25, 25)
         self.CP_enabled.setBrush(QtGui.QColor(255,49,47))
 
         self.setScene(self.scene)
@@ -205,25 +214,36 @@ class UnitView(QtGui.QGraphicsView):
 
     def beamsSet(self, state):
         if state == 0:
-            self.lBeam.setBrush(QtGui.QColor(255,49,47))
-            self.rBeam.setBrush(QtGui.QColor(20,255,92))
+            brushGreen = QtGui.QBrush(QtGui.QColor("#13FF5C"))
+            brushRed = QtGui.QBrush(QtGui.QColor("#FF312F"))
+            self.lBeam.setPen(QtGui.QPen(brushRed, 3))
+            self.rBeam.setPen(QtGui.QPen(brushGreen, 3))
+            #self.lBeam.setBrush(QtGui.QColor(255,49,47))
+            #self.rBeam.setBrush(QtGui.QColor(20,255,92))
         elif state == 1:
-            self.rBeam.setBrush(QtGui.QColor(255,49,47))
-            self.lBeam.setBrush(QtGui.QColor(20,255,92))
+            brushGreen = QtGui.QBrush(QtGui.QColor("#13FF5C"))
+            brushRed = QtGui.QBrush(QtGui.QColor("#FF312F"))
+            self.lBeam.setPen(QtGui.QPen(brushRed, 3))
+            self.rBeam.setPen(QtGui.QPen(brushGreen, 3))
+            #self.rBeam.setBrush(QtGui.QColor(255,49,47))
+            #self.lBeam.setBrush(QtGui.QColor(20,255,92))
         else:
-            self.lBeam.setBrush(QtGui.QColor(255,49,47))
-            self.rBeam.setBrush(QtGui.QColor(255,49,47))
+            brushRed = QtGui.QBrush(QtGui.QColor("#FF312F"))
+            self.lBeam.setPen(QtGui.QPen(brushRed, 3))
+            self.rBeam.setPen(QtGui.QPen(brushRed, 3))
+            #self.lBeam.setBrush(QtGui.QColor(255,49,47))
+            #self.rBeam.setBrush(QtGui.QColor(255,49,47))
 
     def i2c1Set(self, state):
         if state == 0:
             brush = QtGui.QBrush(QtGui.QColor("#FF312F"))
-            self.i2c1.setPen(QtGui.QPen(brush, 5))
+            self.i2c1.setPen(QtGui.QPen(brush, 3))
             self.i2c1LaserNTC.setBrush(QtGui.QColor(255,49,47))
             self.i2c1CpNTC.setBrush(QtGui.QColor(255,49,47))
             self.i2c1Pd_ADC.setBrush(QtGui.QColor(255,49,47))
         else:
             brush = QtGui.QBrush(QtGui.QColor("#13FF5C"))
-            self.i2c1.setPen(QtGui.QPen(brush, 5))
+            self.i2c1.setPen(QtGui.QPen(brush, 3))
             state = bin(state)[2:]
             state = map(int, list(state))
             while len(state) < 3:
@@ -301,24 +321,24 @@ class StateView(QtGui.QGraphicsView):
 
     def initScene(self):
         self.scene = QtGui.QGraphicsScene(self)
-        self.setSceneRect(0, 0, 240, 500)
+        self.setSceneRect(0, 0, 400, 734)
 
         self.image = stateImage()
         self.scene.addItem(self.image)
 
-        self.boot = self.scene.addEllipse(175,140,10,10)
+        self.boot = self.scene.addEllipse(177, 326, 20, 20)
         self.boot.setBrush(QtGui.QColor(255,49,47))
         
-        self.off = self.scene.addEllipse(175,200,10,10)
+        self.off = self.scene.addEllipse(177,407,20,20)
         self.off.setBrush(QtGui.QColor(255,49,47))
         
-        self.idle = self.scene.addEllipse(170,260,10,10)
+        self.idle = self.scene.addEllipse(177,487,20,20)
         self.idle.setBrush(QtGui.QColor(255,49,47))
 
-        self.flash = self.scene.addEllipse(170,315,10,10)
+        self.flash = self.scene.addEllipse(177,568,20,20)
         self.flash.setBrush(QtGui.QColor(255,49,47))
         
-        self.normal = self.scene.addEllipse(50,180,20,20)
+        self.normal = self.scene.addEllipse(77,387,40,40)
         self.normal.setBrush(QtGui.QColor(255,49,47))
 
         self.setScene(self.scene)
@@ -800,22 +820,22 @@ class Doctor(QtGui.QWidget):
 
         self.stateView = StateView(self)
         self.statevbox = QtGui.QVBoxLayout()
-        self.stateView.setFixedWidth(242)
-        #self.stateView.setFixedHeight(502)
+        self.stateView.setFixedWidth(402)
+        self.stateView.setFixedHeight(736)
         self.statevbox.addWidget(self.stateView)
 
         self.unitView = UnitView(self)
         self.unitvbox = QtGui.QVBoxLayout()
         self.unitView.setFixedWidth(512)
-        #self.unitView.setFixedHeight(502)
+        self.unitView.setFixedHeight(736)
         self.unitvbox.addWidget(self.unitView)
 
         #x = np.arange(1000)
         #y = np.random.normal(size=(3, 1000))
 
         self.glw = pg.GraphicsLayoutWidget()
-        #self.glw.setFixedWidth(600)
-        self.glw.setFixedHeight(750)
+        self.glw.setFixedWidth(500)
+        self.glw.setFixedHeight(734)
         self.time_np = []
         
 
