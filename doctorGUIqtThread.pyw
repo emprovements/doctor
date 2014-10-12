@@ -72,6 +72,8 @@ class SerialThread(QtCore.QThread):
         newFrame = False
         oldFrame = ''
         oldData = ''
+        indicator = '-\|/'
+        counter = 0
         while self._stop == False:
             logger.debug('Worker serial read')
 
@@ -96,6 +98,9 @@ class SerialThread(QtCore.QThread):
 
                     if len(newData)>2:
                         if newData[0] == '\x80' and newData[1] == '\x80':
+                            if len(oldData) > 0:
+                                self.parent.receivedDataLabel.setText("Corrupted data received")
+
                             newFrame = True
                             oldData = ''
                             oldData = newData
@@ -105,6 +110,10 @@ class SerialThread(QtCore.QThread):
 					
                     if (len(oldData)>92):
                         logger.debug('W Data going to Queue')
+                        self.parent.receivedDataLabel.setText(indicator[conuter])
+                        counter += 1
+                        if counter == 4:
+                            counter = 0
                         self.emit(QtCore.SIGNAL('serialData(PyQt_PyObject)'), oldData)
                         oldData = ''
                         newFrame = False
@@ -459,12 +468,14 @@ class Doctor(QtGui.QWidget):
             mid1 = math.log(10000.0 / Rt)
         except:
             pass
-        mid2 = 3988.0 / mid1
-        mid3 = mid2 * (-298.15)
-        mid4 = 298.15 - mid2
-        result = (mid3 / mid4) - 273.15
+            return False
+        else:
+            mid2 = 3988.0 / mid1
+            mid3 = mid2 * (-298.15)
+            mid4 = 298.15 - mid2
+            result = (mid3 / mid4) - 273.15
 
-        return result
+            return result
 
 
     def processQueueData(self, data):
@@ -495,8 +506,8 @@ class Doctor(QtGui.QWidget):
 
             self.oldPID_CP_Enabled = self.PID_CP_Enabled
             self.PID_CP_Enabled = ord(rawData[9])
-            I2C_ADC_ColdPlate_NTC = (256*ord(rawData[10]) + ord(rawData[11]))
-            PID_CP_Zpoint = (256*ord(rawData[12]) + ord(rawData[13]))
+            self.I2C_ADC_ColdPlate_NTC = (256*ord(rawData[10]) + ord(rawData[11]))
+            self.PID_CP_Zpoint = (256*ord(rawData[12]) + ord(rawData[13]))
             PID_CP_Output = (256*ord(rawData[14]) + ord(rawData[15]))
             PID_CP_Error = (16777216*ord(rawData[16])+65536*ord(rawData[17])+256*ord(rawData[18])+ord(rawData[19]))
             if ord(rawData[16]) > 127:
@@ -516,8 +527,8 @@ class Doctor(QtGui.QWidget):
 
             self.oldPID_Laser_Enabled = self.PID_Laser_Enabled
             self.PID_Laser_Enabled = ord(rawData[29])
-            I2C_ADC_Laser_NTC = (256*ord(rawData[30]) + ord(rawData[31]))
-            PID_Laser_Zpoint = (256*ord(rawData[32]) + ord(rawData[33]))
+            self.I2C_ADC_Laser_NTC = (256*ord(rawData[30]) + ord(rawData[31]))
+            self.PID_Laser_Zpoint = (256*ord(rawData[32]) + ord(rawData[33]))
             PID_Laser_Output = (256*ord(rawData[34]) + ord(rawData[35]))
             PID_Laser_Error = (16777216*ord(rawData[36])+65536*ord(rawData[37])+256*ord(rawData[38])+ord(rawData[39]))
             if ord(rawData[36]) > 127:
@@ -558,7 +569,6 @@ class Doctor(QtGui.QWidget):
             PID_OSC_Output = (16777216*ord(rawData[68])+65536*ord(rawData[69])+256*ord(rawData[70])+ord(rawData[71]))
             if ord(rawData[68]) > 127:
                 PID_OSC_Output -= 4294967296
-
 
             self.oldWindEyeState = self.WindEyeState
             self.WindEyeState = ord(rawData[73])
@@ -660,10 +670,29 @@ class Doctor(QtGui.QWidget):
 
             self.unitView.beamsSet(self.LC_State)
 #Graphs
-            PID_CP_Zpoint = self.convertNTC(PID_CP_Zpoint)
-            I2C_ADC_ColdPlate_NTC = self.convertNTC(I2C_ADC_ColdPlate_NTC)
-            PID_Laser_Zpoint = self.convertNTC(PID_Laser_Zpoint)
-            I2C_ADC_Laser_NTC = self.convertNTC(I2C_ADC_Laser_NTC)
+            self.PID_CP_Zpoint = self.convertNTC(self.PID_CP_Zpoint)
+            if self.PID_CP_Zpoint == False:
+                self.PID_CP_Zpoint = self.oldPID_CP_Zpoint
+            else:
+                self.oldPID_CP_Zpoint = self.PID_CP_Zpoint
+
+            self.I2C_ADC_ColdPlate_NTC = self.convertNTC(self.I2C_ADC_ColdPlate_NTC)
+            if self.I2C_ADC_ColdPlate_NTC == False:
+                self.I2C_ADC_ColdPlate_NTC = self.oldI2C_ADC_ColdPlate_NTC
+            else:
+                self.oldI2C_ADC_ColdPlate_NTC = self.I2C_ADC_ColdPlate_NTC
+
+            self.PID_Laser_Zpoint = self.convertNTC(self.PID_Laser_Zpoint)
+            if self.PID_Laser_Zpoint == False:
+                self.PID_Laser_Zpoint = self.oldPID_Laser_Zpoint
+            else:
+                self.oldPID_Laser_Zpoint = self.PID_Laser_Zpoint
+
+            self.I2C_ADC_Laser_NTC = self.convertNTC(self.I2C_ADC_Laser_NTC)
+            if self.I2C_ADC_Laser_NTC == False:
+                self.I2C_ADC_Laser_NTC = self.oldI2C_ADC_Laser_NTC
+            else:
+                self.oldI2C_ADC_Laser_NTC = self.I2C_ADC_Laser_NTC
 
             if len(self.time_np)>59:
                 for x in xrange(1,60):
@@ -688,14 +717,14 @@ class Doctor(QtGui.QWidget):
 
                 self.time_np[59] = self.time_np[58]+1
 
-                self.PID_CP_Zpoint_np[59] = PID_CP_Zpoint
+                self.PID_CP_Zpoint_np[59] = self.PID_CP_Zpoint
                 self.PID_CP_Error_np[59] = PID_CP_Error
                 self.PID_CP_x_np[59] = PID_CP_x/100
                 self.PID_CP_Integral_np[59] = PID_CP_Integral/100
-                self.PID_CP_FB_np[59] = I2C_ADC_ColdPlate_NTC
+                self.PID_CP_FB_np[59] = self.I2C_ADC_ColdPlate_NTC
                 
-                self.PID_Laser_Zpoint_np[59] = PID_Laser_Zpoint
-                self.PID_Laser_FB_np[59] = I2C_ADC_Laser_NTC
+                self.PID_Laser_Zpoint_np[59] = self.PID_Laser_Zpoint
+                self.PID_Laser_FB_np[59] = self.I2C_ADC_Laser_NTC
                 self.PID_Laser_Error_np[59] = PID_Laser_Error/100
                 self.PID_Laser_x_np[59] = PID_Laser_x/100
                 
@@ -708,14 +737,14 @@ class Doctor(QtGui.QWidget):
             else:
                 self.time_np.append(len(self.time_np)+1)
 
-                self.PID_CP_Zpoint_np.append(PID_CP_Zpoint)
+                self.PID_CP_Zpoint_np.append(self.PID_CP_Zpoint)
                 self.PID_CP_Error_np.append(PID_CP_Error)
                 self.PID_CP_x_np.append(PID_CP_x/100)
                 self.PID_CP_Integral_np.append(PID_CP_Integral/100)
-                self.PID_CP_FB_np.append(I2C_ADC_ColdPlate_NTC)
+                self.PID_CP_FB_np.append(self.I2C_ADC_ColdPlate_NTC)
                 
-                self.PID_Laser_Zpoint_np.append(PID_Laser_Zpoint)
-                self.PID_Laser_FB_np.append(I2C_ADC_Laser_NTC)
+                self.PID_Laser_Zpoint_np.append(self.PID_Laser_Zpoint)
+                self.PID_Laser_FB_np.append(self.I2C_ADC_Laser_NTC)
                 self.PID_Laser_Error_np.append(PID_Laser_Error/100)
                 self.PID_Laser_x_np.append(PID_Laser_x/100)
 
@@ -741,6 +770,10 @@ class Doctor(QtGui.QWidget):
             self.PID_AMP_Error_curve.setData(self.time_np, self.PID_AMP_Error_np, pen=(255,0,0), name='Error')
             self.PID_AMP_Output_curve.setData(self.time_np, self.PID_AMP_Output_np, pen=(0,255,0), name='Output to CP')
             self.PID_OSC_Output_curve.setData(self.time_np, self.PID_OSC_Output_np, pen=(200,200,200), name='Output to OSC')
+
+        else:
+            self.receivedDataLabel.setText('Corrupted data frame in processing routine')
+
             
 
     def initUI(self):
@@ -980,6 +1013,18 @@ class Doctor(QtGui.QWidget):
         self.Ref_transferred = 0
         self.Flash_errors = 0
         self.Reg_errors = 0
+
+        self.PID_CP_Zpoint = 0
+        self.I2C_ADC_ColdPlate_NTC = 0
+        self.PID_Laser_Zpoint = 0
+        self.I2C_ADC_Laser_NTC = 0
+
+        self.oldPID_CP_Zpoint = 0
+        self.oldI2C_ADC_ColdPlate_NTC = 0
+        self.oldPID_Laser_Zpoint = 0
+        self.oldI2C_ADC_Laser_NTC = 0
+
+
 
 
 
