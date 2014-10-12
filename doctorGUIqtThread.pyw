@@ -110,7 +110,7 @@ class SerialThread(QtCore.QThread):
 					
                     if (len(oldData)>92):
                         logger.debug('W Data going to Queue')
-                        self.parent.receivedDataLabel.setText(indicator[conuter])
+                        self.parent.receivedDataLabel.setText(indicator[counter])
                         counter += 1
                         if counter == 4:
                             counter = 0
