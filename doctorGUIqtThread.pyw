@@ -56,10 +56,10 @@ class SerialThread(QtCore.QThread):
         self.parent = parent
         try:
             port = str(self.parent.comPortComboBox.currentText())
-            port = int(port[3:])
+            port = int(port[3:])-1
 #            baud = (self.parent.boxBaud.get()).split()
-            baud = "115200"
-            self.ser = serial.Serial(port-1, baudrate=int(baud), timeout=0, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE)
+            baud = self.parent.baudRateComboBox.currentText()
+            self.ser = serial.Serial(port, baudrate=int(baud), timeout=0, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE)
         except serial.SerialException:
             logger.error('Cannot open port', exc_info=True)	# by exc_info=True traceback is dumped to the logger
             self._stop = True
@@ -69,11 +69,15 @@ class SerialThread(QtCore.QThread):
             logger.info('Connected to port '+ str(port))
 
     def run (self):						# class which is automatically called after __init__
+        commCounter = 0
         newFrame = False
         oldFrame = ''
         oldData = ''
         indicator = '-\|/'
         counter = 0
+        self.frameData = ''
+        self.frameToggle = False
+
         while self._stop == False:
             logger.debug('Worker serial read')
 
@@ -81,48 +85,61 @@ class SerialThread(QtCore.QThread):
                 n = 0
                 
             else:
+                if (commCounter > 0) and self.frameToggle:
+                    try:
+                        self.ser.write(self.frameData)
+                    except serial.SerialException:
+                        logger.error("Could not write to serial port")
+                    else:
+                        logger.debug('Data SENT to SERIAL')
+                    finally:
+                        self.frameToggle = False
+                        self.frameData = ''
+
                 n = self.ser.inWaiting()			# check if something in serial buffer
 
-            if n:							# read/write serial buffer
-                try:
-                    newData = self.ser.read(n)
-                    #logger.debug('W got data: \n' + repr(newData))
-                    logger.debug('W got data')
+                if n:							# read/write serial buffer
+                    commCounter = 0
+                    try:
+                        newData = self.ser.read(n)
+                        logger.debug('W got data: \n' + repr(newData))
+                        logger.debug('W got data')
 
-                except serial.SerialException:
-                    logger.error('Worker cannot read Serial Port !!!')
+                    except serial.SerialException:
+                        logger.error('Worker cannot read Serial Port !!!')
 
-                else:
-                    if newFrame:
-                        oldData = oldData+newData
+                    else:
+                        if newFrame:
+                            oldData = oldData+newData
 
-                    if len(newData)>2:
-                        if newData[0] == '\x80' and newData[1] == '\x80':
-                            if len(oldData) > 0:
-                                self.parent.receivedDataLabel.setText("Corrupted data received")
+                        if len(newData)>2:
+                            if newData[0] == '\x80' and newData[1] == '\x80':
 
-                            newFrame = True
+                                newFrame = True
+                                oldData = ''
+                                oldData = newData
+
+                                #logger.debug('W New Frame: ' + repr(newData))
+                                logger.debug('W New Frame')
+
+                            else:
+                                if newFrame == False:
+                                    self.parent.receivedDataLabel.setText("Corrupted data received")
+			    		
+                        if (len(oldData)>104):
+                            logger.debug('W Data going to Queue')
+                            self.parent.receivedDataLabel.setText(indicator[counter])
+                            counter += 1
+                            if counter == 4:
+                                counter = 0
+                            self.emit(QtCore.SIGNAL('serialData(PyQt_PyObject)'), oldData)
                             oldData = ''
-                            oldData = newData
+                            newFrame = False
+                else:
+                    commCounter += 1
 
-                            #logger.debug('W New Frame: ' + repr(newData))
-                            logger.debug('W New Frame')
-
-                        else:
-                            if newFrame == False:
-                                self.parent.receivedDataLabel.setText("Corrupted data received")
-					
-                    if (len(oldData)>92):
-                        logger.debug('W Data going to Queue')
-                        self.parent.receivedDataLabel.setText(indicator[counter])
-                        counter += 1
-                        if counter == 4:
-                            counter = 0
-                        self.emit(QtCore.SIGNAL('serialData(PyQt_PyObject)'), oldData)
-                        oldData = ''
-                        newFrame = False
                 n = 0;
-            time.sleep(0.05)
+            time.sleep(0.1)
 
     def toggleStop(self):
         self._stop = True
@@ -130,6 +147,26 @@ class SerialThread(QtCore.QThread):
         logger.info("Serial Data worker stopped")
         self.parent.connectButton.setText("Connect")
         self.parent.connectStatLabel.setText("Disconnected")
+
+    def toggleFrame(self):
+        self.frameToggle = True
+        self.frameData = '\x53'
+
+    def toggleON(self):
+        self.frameToggle = True
+        self.frameData = '\x31'
+
+    def toggleOFF(self):
+        self.frameToggle = True
+        self.frameData = '\x30'
+
+    def toggleIDLE(self):
+        self.frameToggle = True
+        self.frameData = '\x35'
+
+    def toggleFLASH(self):
+        self.frameToggle = True
+        self.frameData = '\x38'
 
 
 class FileOperations():
@@ -389,6 +426,25 @@ class StateView(QtGui.QGraphicsView):
         self.normal.setBrush(QtGui.QColor(200,10,10))
 
 
+class ReFrame(QtGui.QDialog):
+    def __init__(self, frame=[]):
+        super(ReFrame, self).__init__()
+        self.Ref_frame = frame
+
+        self.zero = False
+        self.frame = []
+        self.textBrowser = QtGui.QTextBrowser(self)
+        for i in range(1025):
+            if i == 1:
+                self.zero = True
+            if i<1024:
+                self.frame.append(self.Ref_frame[i])
+            if (((i+1) % 4) == 0) and (self.zero == True):
+                self.textBrowser.append(str(self.frame))
+                self.frame = []
+
+        self.verticalLayout = QtGui.QVBoxLayout(self)
+        self.verticalLayout.addWidget(self.textBrowser)
 
 
 class Doctor(QtGui.QWidget):
@@ -457,6 +513,27 @@ class Doctor(QtGui.QWidget):
             self.loggingData = True
             self.parent.logButton.setText("Logging")
 
+
+    def frameButtonClicked(self):
+        self.serialThread.toggleFrame()
+
+    def onButtonClicked(self):
+        self.serialThread.toggleON()
+
+    def offButtonClicked(self):
+        self.serialThread.toggleOFF()
+
+    def idleButtonClicked(self):
+        self.serialThread.toggleIDLE()
+
+    def flashButtonClicked(self):
+        self.serialThread.toggleFLASH()
+
+    def showButtonClicked(self):
+        self.dialogReFrame = ReFrame(self.Ref_frame)
+        self.dialogReFrame.exec_()
+
+
     #def unitChanged(self):
     #    self.unit.repaint()
 
@@ -486,7 +563,7 @@ class Doctor(QtGui.QWidget):
         logger.debug("Got data from serial for processing")
         rawData = data
         startChar = rawData.find('\x80\x80')
-        if (startChar != -1) and (rawData[startChar+92] == '\x9F'):
+        if (startChar != -1) and (rawData[startChar+104] == '\x9F'):
 
             self.oldUART_TX_Mode = self.UART_TX_Mode
             self.UART_TX_Mode = ord(rawData[2])
@@ -574,25 +651,38 @@ class Doctor(QtGui.QWidget):
             if ord(rawData[68]) > 127:
                 PID_OSC_Output -= 4294967296
 
+            self.oldChange_status = self.Change_status
+            self.Change_status = ord(rawData[72])
+
             self.oldWindEyeState = self.WindEyeState
             self.WindEyeState = ord(rawData[73])
+
             self.olddesState = self.desState
             self.desState = ord(rawData[74])
-            self.oldsomething = self.something
-            self.something = ord(rawData[75])
-            self.oldChange_status = self.Change_status
-            self.Change_status = ord(rawData[76])
 
+            self.oldLC_Pulse_Counter = self.LC_Pulse_Counter
+            self.LC_Pulse_Counter = (256*ord(rawData[75]) + ord(rawData[76]))
+            
             self.oldhHeater = self.hHeater
             self.hHeater = ord(rawData[77])
             
             self.State_Counter_value = (256*ord(rawData[78]) + ord(rawData[79]))
+
             self.oldRef_transferred = self.Ref_transferred
             self.Ref_transferred = (256*ord(rawData[80]) + ord(rawData[81]))
+
             self.oldFlash_errors = self.Flash_errors
             self.Flash_errors = (256*ord(rawData[82]) + ord(rawData[83]))
+
             self.oldReg_errors = self.Reg_errors
             self.Reg_errors = (256*ord(rawData[84]) + ord(rawData[85]))
+
+            self.oldFrame_rcvd = self.Frame_rcvd
+            self.Frame_rcvd = (256*ord(rawData[87]) + ord(rawData[88]))
+            
+            self.oldVersion = self.Version
+            self.Version = (str(ord(rawData[101])) + "." + str(ord(rawData[102])))
+
 
             if self.oldhHeater != self.hHeater:
                 self.unitView.hHeaterSet(self.hHeater)
@@ -653,6 +743,7 @@ class Doctor(QtGui.QWidget):
                     self.Change_status_label.setText('NONE')
 
             self.State_counter_label.setText(str(self.State_Counter_value))
+            self.LC_Pulse_label.setText(str(self.LC_Pulse_Counter))
 
             if self.oldRef_transferred != self.Ref_transferred:
                 self.Ref_transferred_label.setText(str(self.Ref_transferred))
@@ -663,6 +754,9 @@ class Doctor(QtGui.QWidget):
             if self.oldReg_errors != self.Reg_errors:
                 self.Reg_errors_label.setText(str(self.Reg_errors))
 
+            if self.oldFrame_rcvd != self.Frame_rcvd:
+                self.Frame_rcvd_label.setText(str(self.Frame_rcvd))
+
             if self.oldADC_I2C1_Enable != self.ADC_I2C1_Enable:
                 self.unitView.i2c1Set(self.ADC_I2C1_Enable)
 
@@ -671,6 +765,9 @@ class Doctor(QtGui.QWidget):
             
             if self.oldPORTD != self.PORTD:
                 self.unitView.portdSet(self.PORTD)
+
+            if self.oldVersion != self.Version:
+                self.Version_label.setText(self.Version)
 
             self.unitView.beamsSet(self.LC_State)
 #Graphs
@@ -775,6 +872,24 @@ class Doctor(QtGui.QWidget):
             self.PID_AMP_Output_curve.setData(self.time_np, self.PID_AMP_Output_np, pen=(0,255,0), name='Output to CP')
             self.PID_OSC_Output_curve.setData(self.time_np, self.PID_OSC_Output_np, pen=(200,200,200), name='Output to OSC')
 
+
+        elif (startChar != -1) and (rawData[startChar+104] == '\xF9'):
+            self.counterRef_frame = ord(rawData[2])
+            if self.counterRef_frame == 0:
+                for i in range(1, 12):
+                    self.loaderRef_frame[i] = "_"
+            if self.counterRef_frame < 10:
+                for i in xrange(3,103):
+                    self.Ref_frame[(i-3)+(100*self.counterRef_frame)] = ord(rawData[i])
+            else:
+                for i in xrange(3,27):
+                    self.Ref_frame[(i-3)+(100*self.counterRef_frame)] = ord(rawData[i])
+
+            self.loaderRef_frame[self.counterRef_frame+1] = "*"
+            self.receivedFrameLabel.setText(''.join(self.loaderRef_frame))
+
+
+
         else:
             self.receivedDataLabel.setText('Corrupted data frame in processing routine')
 
@@ -786,25 +901,48 @@ class Doctor(QtGui.QWidget):
         #qbtn.clicked.connect(QtCore.QCoreApplication.instance().quit)
         #qbtn.resize(qbtn.sizeHint())
         #qbtn.move(50, 50)
+        
+        self.loaderRef_frame = []
+        for x in range(13):
+            self.loaderRef_frame.append('_')
+        self.loaderRef_frame[0] = "|"
+        self.loaderRef_frame[12] = "|"
+ 
+        self.counterRef_frame = 0
+        self.Ref_frame = []
+        for x in range(1024):
+            self.Ref_frame.append(0)
 
         self.receivedDataLabel = QtGui.QLabel('Received Data')
+        self.receivedFrameLabel = QtGui.QLabel('|___________|')
         self.logButton = QtGui.QPushButton('Log Data', self)
+        self.frameButton = QtGui.QPushButton('Read Ref.Frame', self)
+        self.showFrameButton = QtGui.QPushButton('Show Ref.Frame', self)
 
         self.uppesthbox = QtGui.QHBoxLayout()
+        self.uppesthbox.addWidget(self.frameButton)
+        self.uppesthbox.addWidget(self.receivedFrameLabel)
+        self.uppesthbox.addWidget(self.showFrameButton)
         self.uppesthbox.addStretch(1)
         self.uppesthbox.addWidget(self.receivedDataLabel)
         self.uppesthbox.addStretch(1)
         self.uppesthbox.addWidget(self.logButton)
 
 #add labels
+        self.Version_hbox = QtGui.QHBoxLayout()
+        self.Version_label = QtGui.QLabel('-')
+        self.Version_hbox.addWidget(self.Version_label)
+        self.Version_Gbox = QtGui.QGroupBox("Firmware version")
+        self.Version_Gbox.setLayout(self.Version_hbox)
+
         self.UART_TX_Mode_hbox = QtGui.QHBoxLayout()
-        self.UART_TX_Mode_label = QtGui.QLabel('0')
+        self.UART_TX_Mode_label = QtGui.QLabel('-')
         self.UART_TX_Mode_hbox.addWidget(self.UART_TX_Mode_label)
         self.UART_TX_Mode_Gbox = QtGui.QGroupBox("UART TX Mode")
         self.UART_TX_Mode_Gbox.setLayout(self.UART_TX_Mode_hbox)
 
         self.BootState_hbox = QtGui.QHBoxLayout()
-        self.BootState_label = QtGui.QLabel('0')
+        self.BootState_label = QtGui.QLabel('-')
         self.BootState_hbox.addWidget(self.BootState_label)
         self.BootState_Gbox = QtGui.QGroupBox("Boot State")
         self.BootState_Gbox.setLayout(self.BootState_hbox)
@@ -816,7 +954,7 @@ class Doctor(QtGui.QWidget):
         self.Ticks_Gbox.setLayout(self.Ticks_hbox)
         
         self.Change_status_hbox = QtGui.QHBoxLayout()
-        self.Change_status_label = QtGui.QLabel('0')
+        self.Change_status_label = QtGui.QLabel('-')
         self.Change_status_hbox.addWidget(self.Change_status_label)
         self.Change_status_Gbox = QtGui.QGroupBox("Change status")
         self.Change_status_Gbox.setLayout(self.Change_status_hbox)
@@ -826,11 +964,17 @@ class Doctor(QtGui.QWidget):
         self.State_counter_hbox.addWidget(self.State_counter_label)
         self.State_counter_Gbox = QtGui.QGroupBox("State counter value")
         self.State_counter_Gbox.setLayout(self.State_counter_hbox)
-        
+
+        self.LC_Pulse_hbox = QtGui.QHBoxLayout()
+        self.LC_Pulse_label = QtGui.QLabel('0')
+        self.LC_Pulse_hbox.addWidget(self.LC_Pulse_label)
+        self.LC_Pulse_Gbox = QtGui.QGroupBox("LC Pulse time performance")
+        self.LC_Pulse_Gbox.setLayout(self.LC_Pulse_hbox)
+
         self.Ref_transferred_hbox = QtGui.QHBoxLayout()
         self.Ref_transferred_label = QtGui.QLabel('0')
         self.Ref_transferred_hbox.addWidget(self.Ref_transferred_label)
-        self.Ref_transferred_Gbox = QtGui.QGroupBox("Reference fr. transferred")
+        self.Ref_transferred_Gbox = QtGui.QGroupBox("Ref. frame bytes transferred")
         self.Ref_transferred_Gbox.setLayout(self.Ref_transferred_hbox)
 
         self.Flash_errors_hbox = QtGui.QHBoxLayout()
@@ -845,15 +989,24 @@ class Doctor(QtGui.QWidget):
         self.Reg_errors_Gbox = QtGui.QGroupBox("Register errors")
         self.Reg_errors_Gbox.setLayout(self.Reg_errors_hbox)
 
+        self.Frame_rcvd_hbox = QtGui.QHBoxLayout()
+        self.Frame_rcvd_label = QtGui.QLabel('0')
+        self.Frame_rcvd_hbox.addWidget(self.Frame_rcvd_label)
+        self.Frame_rcvd_Gbox = QtGui.QGroupBox("Ref. frame bytes received")
+        self.Frame_rcvd_Gbox.setLayout(self.Frame_rcvd_hbox)
+
         self.datavbox = QtGui.QVBoxLayout()
+        self.datavbox.addWidget(self.Version_Gbox)
         self.datavbox.addWidget(self.UART_TX_Mode_Gbox)
         self.datavbox.addWidget(self.BootState_Gbox)
         self.datavbox.addWidget(self.Ticks_Gbox)
         self.datavbox.addWidget(self.Change_status_Gbox)
         self.datavbox.addWidget(self.State_counter_Gbox)
+        self.datavbox.addWidget(self.LC_Pulse_Gbox)
         self.datavbox.addWidget(self.Ref_transferred_Gbox)
         self.datavbox.addWidget(self.State_counter_Gbox)
         self.datavbox.addWidget(self.Ref_transferred_Gbox)
+        self.datavbox.addWidget(self.Frame_rcvd_Gbox)
         self.datavbox.addWidget(self.Flash_errors_Gbox)
         self.datavbox.addWidget(self.Reg_errors_Gbox)
         self.datavbox.addStretch(1)
@@ -958,8 +1111,11 @@ class Doctor(QtGui.QWidget):
         self.comPortComboBox.addItem("Search")
         #self.connect(self.comPortComboBox, QtCore.SIGNAL("highlighted(int)"), self.updtPortsList)
         #self.comPortComboBox.activated.connect(self.updtPortsList)
-
+        
+        self.baudRates = ['9600', '19200', '38400', '57600', '115200']
         self.baudRateComboBox = QtGui.QComboBox()
+        self.baudRateComboBox.addItems(self.baudRates)
+        self.baudRateComboBox.setCurrentIndex(4)
 
         self.connectButtonState = False
         self.connectButton = QtGui.QPushButton('Connect', self)
@@ -974,9 +1130,23 @@ class Doctor(QtGui.QWidget):
         self.lowerhbox.addWidget(self.connectButton)
 
 
+        self.onButton = QtGui.QPushButton('ON STATE', self)
+        self.offButton = QtGui.QPushButton('OFF STATE', self)
+        self.idleButton = QtGui.QPushButton('IDLE STATE', self)
+        self.flashButton = QtGui.QPushButton('FLASH STATE', self)
+       
+        self.lowhbox = QtGui.QHBoxLayout()
+        self.lowhbox.addWidget(self.onButton)
+        self.lowhbox.addWidget(self.offButton)
+        self.lowhbox.addWidget(self.idleButton)
+        self.lowhbox.addWidget(self.flashButton)
+        self.lowhbox.addStretch(1)
+
+
         self.vbox = QtGui.QVBoxLayout()              # MAIN Box
         self.vbox.addLayout(self.uppesthbox)
         self.vbox.addLayout(self.upperhbox)
+        self.vbox.addLayout(self.lowhbox)
         self.vbox.addLayout(self.lowerhbox)
         self.vbox.addStretch(1)
 
@@ -985,6 +1155,12 @@ class Doctor(QtGui.QWidget):
         self.connect(self.connectButton, QtCore.SIGNAL("clicked()"), self.OnPressConnect)
         self.connect(self.logButton, QtCore.SIGNAL("clicked()"), self.OnPressLog)
         self.connect(self.comPortComboBox, QtCore.SIGNAL("activated(int)"), self.updtPortsList)
+        self.connect(self.showFrameButton, QtCore.SIGNAL("clicked()"), self.showButtonClicked)
+        self.connect(self.frameButton, QtCore.SIGNAL("clicked()"), self.frameButtonClicked)
+        self.connect(self.onButton, QtCore.SIGNAL("clicked()"), self.onButtonClicked)
+        self.connect(self.offButton, QtCore.SIGNAL("clicked()"), self.offButtonClicked)
+        self.connect(self.idleButton, QtCore.SIGNAL("clicked()"), self.idleButtonClicked)
+        self.connect(self.flashButton, QtCore.SIGNAL("clicked()"), self.flashButtonClicked)
         #self.connect(self, QtCore.SIGNAL("unitSignal(int)"), self.unitChanged)
         #self.connect(self.comPortComboBox, QtCore.SIGNAL("currentIndexChanged(int)"), self.comPortComboBox, QtCore.SLOT("blockSignals(False)"))
         #self.connect(self.comPortComboBox, QtCore.SIGNAL("currentIndexChanged(int)"), self.comPortComboBox.blockSignals(False))
@@ -1009,14 +1185,16 @@ class Doctor(QtGui.QWidget):
     
         self.WindEyeState = 0
         self.desState = 0
-        self.something = 0
+        self.LC_Pulse_Counter = 0
         self.Change_status = 3
             
+        self.I2C2_Error =0
         self.hHeater = 0
 
         self.Ref_transferred = 0
         self.Flash_errors = 0
         self.Reg_errors = 0
+        self.Frame_rcvd = 0
 
         self.PID_CP_Zpoint = 0
         self.I2C_ADC_ColdPlate_NTC = 0
@@ -1028,7 +1206,7 @@ class Doctor(QtGui.QWidget):
         self.oldPID_Laser_Zpoint = 0
         self.oldI2C_ADC_Laser_NTC = 0
 
-
+        self.Version = 0
 
 
 
